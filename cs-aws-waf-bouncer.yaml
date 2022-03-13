@@ -1,34 +1,15 @@
-api_key: XXXX
+api_key: XXX
 api_url: "http://127.0.0.1:8081/"
 update_frequency: 10s
 waf_config:
   - web_acl_name: mywebacl
-    action:
-      type: BLOCK
-    rule_name: crowdsec-blocklist
+    fallback_action: ban
+    rule_group_name: crowdsec-rule-group-eu-west-1
     scope: REGIONAL
     region: eu-west-1
-    ipset_config: &ipset_config_1
-      ipv4_set_name: crowdsec-blocklist-ipv4-eu-west-1
-      ipv6_set_name: crowdsec-blocklist-ipv6-eu-west-1
-      rule_group_name: crowdsec-rule-group-eu-west-1
-  - web_acl_name: test-web-acl
-    action:
-      type: BLOCK
-      #custom_body_file: /etc/foobar/block.html
-    rule_name: crowdsec-blocklist-2
-    scope: REGIONAL
-    region: eu-west-1
-    ipset_config:
-      ipv4_set_name: crowdsec-blocklist-ipv4-eu-west-1
-      ipv6_set_name: crowdsec-blocklist-ipv6-eu-west-1
-      rule_group_name: crowdsec-rule-group-eu-west-1
+    ipset_prefix: crowdsec-blocklist-a
   - web_acl_name: test-cloudfront
-    action:
-      type: CAPTCHA
-    rule_name: crowdsec-blocklist-cloudfront
+    fallback_action: captcha
+    rule_group_name: crowdsec-rule-group-cloudfront
     scope: CLOUDFRONT
-    ipset_config:
-      ipv4_set_name: crowdsec-blocklist-ipv4-cloudfront
-      ipv6_set_name: crowdsec-blocklist-ipv6-cloudfront
-      rule_group_name: crowdsec-rule-group-cloudfront
+    ipset_prefix: crowdsec-blocklist-cf

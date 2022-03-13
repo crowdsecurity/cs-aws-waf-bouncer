@@ -20,25 +20,16 @@ type bouncerConfig struct {
 	WebACLConfig       []AclConfig `yaml:"waf_config"`
 }
 
-type ruleAction struct {
-	Type           string `yaml:"type"`
-	CustomBodyFile string `yaml:"custom_body_file"`
-}
-
 type AclConfig struct {
-	WebACLName  string `yaml:"web_acl_name"`
-	RuleName    string `yaml:"rule_name"`
-	Region      string `yaml:"region"`
-	Scope       string `yaml:"scope"`
-	IPSetConfig struct {
-		IPv4SetName   string `yaml:"ipv4_set_name"`
-		IPv6SetName   string `yaml:"ipv6_set_name"`
-		RuleGroupName string `yaml:"rule_group_name"`
-	} `yaml:"ipset_config"`
-	Action ruleAction `yaml:"action"`
+	WebACLName     string `yaml:"web_acl_name"`
+	RuleGroupName  string `yaml:"rule_group_name"`
+	Region         string `yaml:"region"`
+	Scope          string `yaml:"scope"`
+	IpsetPrefix    string `yaml:"ipset_prefix"`
+	FallbackAction string `yaml:"fallback_action"`
 }
 
-var validActions = []string{"ALLOW", "BLOCK", "COUNT", "CAPTCHA"}
+var validActions = []string{"ban", "captcha"}
 var validScopes = []string{"REGIONAL", "CLOUDFRONT"}
 
 func newConfig(configPath string) (bouncerConfig, error) {
@@ -64,14 +55,14 @@ func newConfig(configPath string) (bouncerConfig, error) {
 		config.LogLevel = "INFO"
 	}
 	for _, c := range config.WebACLConfig {
-		if c.Action.Type == "" {
-			return bouncerConfig{}, fmt.Errorf("action is required")
+		if c.FallbackAction == "" {
+			return bouncerConfig{}, fmt.Errorf("fallback_action is required")
 		}
-		if !contains(validActions, c.Action.Type) {
-			return bouncerConfig{}, fmt.Errorf("action must be one of %v", validActions)
+		if !contains(validActions, c.FallbackAction) {
+			return bouncerConfig{}, fmt.Errorf("fallback_action must be one of %v", validActions)
 		}
-		if c.RuleName == "" {
-			return bouncerConfig{}, fmt.Errorf("rule_name is required")
+		if c.RuleGroupName == "" {
+			return bouncerConfig{}, fmt.Errorf("rule_group_name is required")
 		}
 		if c.Scope == "" {
 			return bouncerConfig{}, fmt.Errorf("scope is required")
@@ -79,21 +70,15 @@ func newConfig(configPath string) (bouncerConfig, error) {
 		if !contains(validScopes, c.Scope) {
 			return bouncerConfig{}, fmt.Errorf("scope must be one of %v", validScopes)
 		}
-		if c.IPSetConfig.IPv4SetName == "" {
-			return bouncerConfig{}, fmt.Errorf("ipv4_set_name is required")
-		}
-		if c.IPSetConfig.IPv6SetName == "" {
-			return bouncerConfig{}, fmt.Errorf("ipv6_set_name is required")
-		}
-		if c.IPSetConfig.RuleGroupName == "" {
-			return bouncerConfig{}, fmt.Errorf("rule_group_name is required")
+		if c.IpsetPrefix == "" {
+			return bouncerConfig{}, fmt.Errorf("ipset_prefix is required")
 		}
 		if c.Region == "" && strings.ToUpper(c.Scope) == "REGIONAL" {
 			return bouncerConfig{}, fmt.Errorf("region is required when scope is REGIONAL")
 		}
-		if c.Action.CustomBodyFile != "" && strings.ToUpper(c.Action.Type) != "BLOCK" {
+		/*if c.Action.CustomBodyFile != "" && strings.ToUpper(c.Action.Type) != "BLOCK" {
 			return bouncerConfig{}, fmt.Errorf("custom_body_file is only valid when action is BLOCK")
-		}
+		}*/
 	}
 	return config, nil
 }

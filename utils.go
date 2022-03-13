@@ -1,5 +1,7 @@
 package main
 
+import "github.com/aws/aws-sdk-go/service/wafv2"
+
 func containsStringPtr(slice []*string, s string) bool {
 	for _, item := range slice {
 		if *item == s {
@@ -25,4 +27,13 @@ func contains(s []string, e string) bool {
 		}
 	}
 	return false
+}
+
+func removeRuleFromRuleGroup(rules []*wafv2.Rule, name string) []*wafv2.Rule {
+	for i, r := range rules {
+		if *r.Name == name {
+			return append(rules[:i], rules[i+1:]...)
+		}
+	}
+	return rules
 }

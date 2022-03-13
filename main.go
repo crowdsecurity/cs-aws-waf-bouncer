@@ -3,18 +3,114 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/crowdsecurity/crowdsec/pkg/models"
 	csbouncer "github.com/crowdsecurity/go-cs-bouncer"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/tomb.v2"
 )
 
+type Decisions struct {
+	v4Add        map[string][]*string
+	v6Add        map[string][]*string
+	v4Del        map[string][]*string
+	v6Del        map[string][]*string
+	countriesAdd map[string][]*string
+	countriesDel map[string][]*string
+}
+
+var wafInstances []WAF = make([]WAF, 0)
+var t *tomb.Tomb = &tomb.Tomb{}
+
+func signalHandler() {
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan,
+		syscall.SIGTERM)
+	go func() {
+		<-signalChan
+		log.Info("Received SIGTERM, exiting")
+		for _, waf := range wafInstances {
+			waf.logger.Infof("Cleaning up ressources")
+			err := waf.Cleanup()
+			if err != nil {
+				log.Errorf("Error cleaning up WAF: %s", err)
+			}
+		}
+		t.Kill(nil)
+	}()
+}
+
+func processDecisions(decisions *models.DecisionsStreamResponse) Decisions {
+	d := Decisions{
+		v4Add:        make(map[string][]*string),
+		v6Add:        make(map[string][]*string),
+		v4Del:        make(map[string][]*string),
+		v6Del:        make(map[string][]*string),
+		countriesAdd: make(map[string][]*string),
+		countriesDel: make(map[string][]*string),
+	}
+
+	for _, decision := range decisions.New {
+		decisionType := strings.ToLower(*decision.Type)
+		if decisionType != "ban" && decisionType != "captcha" {
+			decisionType = "fallback"
+		}
+		if strings.ToLower(*decision.Scope) == "ip" || strings.ToLower(*decision.Scope) == "range" {
+			if strings.Contains(*decision.Value, ":") {
+				if !strings.Contains(*decision.Value, "/") {
+					d.v6Add[decisionType] = append(d.v6Add[decisionType], aws.String(fmt.Sprintf("%s/128", *decision.Value)))
+				} else {
+					d.v6Add[decisionType] = append(d.v6Add[decisionType], decision.Value)
+				}
+			} else {
+				if !strings.Contains(*decision.Value, "/") {
+					d.v4Add[decisionType] = append(d.v4Add[decisionType], aws.String(fmt.Sprintf("%s/32", *decision.Value)))
+				} else {
+					d.v4Add[decisionType] = append(d.v4Add[decisionType], decision.Value)
+				}
+			}
+		} else if strings.ToLower(*decision.Scope) == "country" {
+			d.countriesAdd[decisionType] = append(d.countriesAdd[decisionType], decision.Value)
+		} else {
+			log.Errorf("unsupported scope: %s", *decision.Scope)
+		}
+	}
+
+	for _, decision := range decisions.Deleted {
+		decisionType := strings.ToLower(*decision.Type)
+		if decisionType != "ban" && decisionType != "captcha" {
+			decisionType = "fallback"
+		}
+		if strings.ToLower(*decision.Scope) == "ip" || strings.ToLower(*decision.Scope) == "range" {
+			if strings.Contains(*decision.Value, ":") {
+				if !strings.Contains(*decision.Value, "/") {
+					d.v6Del[decisionType] = append(d.v6Del[decisionType], aws.String(fmt.Sprintf("%s/128", *decision.Value)))
+				} else {
+					d.v6Del[decisionType] = append(d.v6Del[decisionType], decision.Value)
+				}
+			} else {
+				if !strings.Contains(*decision.Value, "/") {
+					d.v4Del[decisionType] = append(d.v4Del[decisionType], aws.String(fmt.Sprintf("%s/32", *decision.Value)))
+				} else {
+					d.v4Del[decisionType] = append(d.v4Del[decisionType], decision.Value)
+				}
+			}
+		} else if strings.ToLower(*decision.Scope) == "country" {
+			d.countriesDel[decisionType] = append(d.countriesDel[decisionType], decision.Value)
+		} else {
+			log.Errorf("unsupported scope: %s", *decision.Scope)
+		}
+	}
+
+	return d
+}
+
 func main() {
-
-	wafInstances := make([]WAF, 0)
-
 	configPath := flag.String("c", "", "path to crowdsec-firewall-bouncer.yaml")
 	//verbose := flag.Bool("v", false, "set verbose mode")
 	//bouncerVersion := flag.Bool("V", false, "display version and exit")
@@ -56,12 +152,15 @@ func main() {
 		wafInstances = append(wafInstances, w)
 	}
 
+	signalHandler()
+
 	bouncer := &csbouncer.StreamBouncer{
 		APIKey:             config.APIKey,
 		APIUrl:             config.APIUrl,
 		TickerInterval:     config.UpdateFrequency,
 		InsecureSkipVerify: aws.Bool(config.InsecureSkipVerify),
 		UserAgent:          "cs-aws-waf-bouncer/0.0.1",
+		Scopes:             []string{"ip", "range", "country"},
 	}
 
 	if err := bouncer.Init(); err != nil {
@@ -70,57 +169,25 @@ func main() {
 
 	go bouncer.Run()
 
-	t := &tomb.Tomb{}
-
 	t.Go(func() error {
 		log.Info("Starting processing decisions")
 		for {
 			select {
 			case <-t.Dying():
 				log.Info("tomb is dying")
+				for _, w := range wafInstances {
+					w.t.Kill(nil)
+				}
+				return nil
+			case <-t.Dead():
+				log.Info("tomb is dead")
 				return nil
 			case decisions := <-bouncer.Stream:
 				log.Info("got decisions")
-				v4toAdd := make([]*string, 0)
-				v6toAdd := make([]*string, 0)
-				v4toDelete := make([]*string, 0)
-				v6toDelete := make([]*string, 0)
-				for _, decision := range decisions.New {
-					if strings.Contains(*decision.Value, ":") {
-						if !strings.Contains(*decision.Value, "/") {
-							v6toAdd = append(v6toAdd, aws.String(fmt.Sprintf("%s/128", *decision.Value)))
-						} else {
-							v6toAdd = append(v6toAdd, decision.Value)
-						}
-					} else {
-						if !strings.Contains(*decision.Value, "/") {
-							v4toAdd = append(v4toAdd, aws.String(fmt.Sprintf("%s/32", *decision.Value)))
-						} else {
-							v4toAdd = append(v4toAdd, decision.Value)
-						}
-					}
-				}
-				for _, decision := range decisions.Deleted {
-					if strings.Contains(*decision.Value, ":") {
-						if !strings.Contains(*decision.Value, "/") {
-							v6toDelete = append(v6toDelete, aws.String(fmt.Sprintf("%s/128", *decision.Value)))
-						} else {
-							v6toDelete = append(v6toDelete, decision.Value)
-						}
-					} else {
-						if !strings.Contains(*decision.Value, "/") {
-							v4toDelete = append(v4toDelete, aws.String(fmt.Sprintf("%s/32", *decision.Value)))
-						} else {
-							v4toDelete = append(v4toDelete, decision.Value)
-						}
-					}
-				}
-				log.Infof("Adding %d IPv4 | Deleting %d IPv4 | Adding %d IPv6 | Deleting %d IPv6", len(v4toAdd), len(v4toDelete), len(v6toAdd), len(v6toDelete))
-				for _, waf := range wafInstances {
-					err := waf.UpdateSetsContent(v4toAdd, v6toAdd, v4toDelete, v6toDelete)
-					if err != nil {
-						waf.logger.Errorf("could not update ipset: %s", err)
-					}
+
+				d := processDecisions(decisions)
+				for _, w := range wafInstances {
+					w.decisionsChan <- d
 				}
 			}
 		}
