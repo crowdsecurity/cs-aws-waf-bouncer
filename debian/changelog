@@ -1,0 +1,5 @@
+crowdsec-aws-waf-bouncer (1.0.0) UNRELEASED; urgency=medium
+
+  * Initial release
+
+ -- Sebastien Blot <sebastien@crowdsec.net>  Fri, 11 Mar 2022 14:58:22 +0100

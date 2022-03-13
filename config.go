@@ -5,6 +5,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/crowdsecurity/crowdsec/pkg/types"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
 
@@ -14,7 +17,7 @@ type bouncerConfig struct {
 	UpdateFrequency    string      `yaml:"update_frequency"`
 	InsecureSkipVerify bool        `yaml:"insecure_skip_verify"`
 	Daemon             bool        `yaml:"daemon"`
-	LogLevel           string      `yaml:"log_level"`
+	LogLevel           log.Level   `yaml:"log_level"`
 	LogMedia           string      `yaml:"log_media"`
 	LogDir             string      `yaml:"log_dir"`
 	WebACLConfig       []AclConfig `yaml:"waf_config"`
@@ -33,15 +36,23 @@ var validActions = []string{"ban", "captcha"}
 var validScopes = []string{"REGIONAL", "CLOUDFRONT"}
 
 func newConfig(configPath string) (bouncerConfig, error) {
+	var config bouncerConfig
+
 	content, err := os.ReadFile(configPath)
+	ipsetPrefix := make(map[string]bool)
+	ruleGroupNames := make(map[string]bool)
 	if err != nil {
 		return bouncerConfig{}, err
 	}
-	var config bouncerConfig
 	err = yaml.UnmarshalStrict(content, &config)
 	if err != nil {
 		return bouncerConfig{}, err
 	}
+
+	if err = types.SetDefaultLoggerConfig(config.LogMedia, config.LogDir, config.LogLevel, 10, 2, 1, aws.Bool(true)); err != nil {
+		log.Fatal(err.Error())
+	}
+
 	if config.APIKey == "" {
 		return bouncerConfig{}, fmt.Errorf("api_key is required")
 	}
@@ -51,8 +62,11 @@ func newConfig(configPath string) (bouncerConfig, error) {
 	if config.UpdateFrequency == "" {
 		config.UpdateFrequency = "10s"
 	}
-	if config.LogLevel == "" {
+	/*if config.LogLevel == "" {
 		config.LogLevel = "INFO"
+	}*/
+	if len(config.WebACLConfig) == 0 {
+		return bouncerConfig{}, fmt.Errorf("waf_config is required")
 	}
 	for _, c := range config.WebACLConfig {
 		if c.FallbackAction == "" {
@@ -76,9 +90,16 @@ func newConfig(configPath string) (bouncerConfig, error) {
 		if c.Region == "" && strings.ToUpper(c.Scope) == "REGIONAL" {
 			return bouncerConfig{}, fmt.Errorf("region is required when scope is REGIONAL")
 		}
-		/*if c.Action.CustomBodyFile != "" && strings.ToUpper(c.Action.Type) != "BLOCK" {
-			return bouncerConfig{}, fmt.Errorf("custom_body_file is only valid when action is BLOCK")
-		}*/
+		if _, ok := ipsetPrefix[c.IpsetPrefix]; ok {
+			return bouncerConfig{}, fmt.Errorf("ipset_prefix value must be unique")
+		} else {
+			ipsetPrefix[c.IpsetPrefix] = true
+		}
+		if _, ok := ruleGroupNames[c.RuleGroupName]; ok {
+			return bouncerConfig{}, fmt.Errorf("rule_group_name value must be unique")
+		} else {
+			ruleGroupNames[c.RuleGroupName] = true
+		}
 	}
 	return config, nil
 }

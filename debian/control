@@ -1,0 +1,9 @@
+Source: crowdsec-aws-waf-bouncer
+Maintainer: Crowdsec Team <debian@crowdsec.net>
+Build-Depends: debhelper, bash
+
+Package: crowdsec-aws-waf-bouncer
+Provides: crowdsec-aws-waf-bouncer
+Description: AWS WAF bouncer for Crowdsec
+Architecture: any
+

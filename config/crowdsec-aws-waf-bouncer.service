@@ -1,0 +1,10 @@
+[Unit]
+Description=CrowdSec bouncer for AWS WAF
+After=syslog.target crowdsec.service
+
+[Service]
+Type=notify
+ExecStart=${BIN} -c ${CFG}/crowdsec-aws-waf-bouncer.yaml
+
+[Install]
+WantedBy=multi-user.target

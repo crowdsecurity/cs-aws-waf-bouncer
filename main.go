@@ -9,7 +9,9 @@ import (
 	"syscall"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/coreos/go-systemd/daemon"
 	"github.com/crowdsecurity/crowdsec/pkg/models"
+	"github.com/crowdsecurity/cs-aws-waf-bouncer/version"
 	csbouncer "github.com/crowdsecurity/go-cs-bouncer"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/tomb.v2"
@@ -112,13 +114,19 @@ func processDecisions(decisions *models.DecisionsStreamResponse) Decisions {
 
 func main() {
 	configPath := flag.String("c", "", "path to crowdsec-firewall-bouncer.yaml")
-	//verbose := flag.Bool("v", false, "set verbose mode")
-	//bouncerVersion := flag.Bool("V", false, "display version and exit")
+	bouncerVersion := flag.Bool("V", false, "display version and exit")
 	traceMode := flag.Bool("trace", false, "set trace mode")
 	debugMode := flag.Bool("debug", false, "set debug mode")
 	testConfig := flag.Bool("t", false, "test config and exit")
 
 	flag.Parse()
+
+	if *bouncerVersion {
+		fmt.Printf("%s", version.ShowStr())
+		os.Exit(0)
+	}
+
+	config, err := newConfig(*configPath)
 
 	if debugMode != nil && *debugMode {
 		log.SetLevel(log.DebugLevel)
@@ -128,15 +136,33 @@ func main() {
 		log.SetLevel(log.TraceLevel)
 	}
 
-	config, err := newConfig(*configPath)
-
 	if err != nil {
 		log.Fatalf("could not parse configuration: %s", err)
 	}
 
 	if *testConfig {
+		for _, wafConfig := range config.WebACLConfig {
+			log.Debugf("Create WAF instance with config: %+v", wafConfig)
+			_, err := NewWaf(wafConfig)
+			if err != nil {
+				log.Fatalf("Configuration error: %s", err)
+			}
+		}
 		log.Info("valid config")
 		return
+	}
+
+	bouncer := &csbouncer.StreamBouncer{
+		APIKey:             config.APIKey,
+		APIUrl:             config.APIUrl,
+		TickerInterval:     config.UpdateFrequency,
+		InsecureSkipVerify: aws.Bool(config.InsecureSkipVerify),
+		UserAgent:          fmt.Sprintf("crowdsec-aws-waf-bouncer/%s", version.VersionStr()),
+		Scopes:             []string{"ip", "range", "country"},
+	}
+
+	if err := bouncer.Init(); err != nil {
+		log.Fatalf(err.Error())
 	}
 
 	for _, wafConfig := range config.WebACLConfig {
@@ -154,20 +180,14 @@ func main() {
 
 	signalHandler()
 
-	bouncer := &csbouncer.StreamBouncer{
-		APIKey:             config.APIKey,
-		APIUrl:             config.APIUrl,
-		TickerInterval:     config.UpdateFrequency,
-		InsecureSkipVerify: aws.Bool(config.InsecureSkipVerify),
-		UserAgent:          "cs-aws-waf-bouncer/0.0.1",
-		Scopes:             []string{"ip", "range", "country"},
-	}
-
-	if err := bouncer.Init(); err != nil {
-		log.Fatalf(err.Error())
-	}
-
 	go bouncer.Run()
+
+	if config.Daemon {
+		sent, err := daemon.SdNotify(false, "READY=1")
+		if !sent && err != nil {
+			log.Warnf("failed to notify: %v", err)
+		}
+	}
 
 	t.Go(func() error {
 		log.Info("Starting processing decisions")
