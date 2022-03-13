@@ -854,6 +854,7 @@ func (w WAF) Dump() {
 }
 
 func NewWaf(config AclConfig) (WAF, error) {
+	var s *session.Session
 	if config.Scope == "CLOUDFRONT" {
 		config.Region = "us-east-1"
 	}
@@ -872,10 +873,21 @@ func NewWaf(config AclConfig) (WAF, error) {
 		decisionsChan:   make(chan Decisions),
 	}
 
-	session := session.Must(session.NewSession(&aws.Config{
-		Region: aws.String(config.Region),
-	}))
-	client := wafv2.New(session)
+	if config.AWSProfile == "" {
+		s = session.Must(session.NewSession(&aws.Config{
+			Region:                        aws.String(config.Region),
+			CredentialsChainVerboseErrors: aws.Bool(true),
+		}))
+	} else {
+		s = session.Must(session.NewSessionWithOptions(session.Options{
+			Profile: config.AWSProfile,
+			Config: aws.Config{
+				Region:                        aws.String(config.Region),
+				CredentialsChainVerboseErrors: aws.Bool(true),
+			},
+		}))
+	}
+	client := wafv2.New(s)
 	w.client = client
 	w.config = &config
 	w.t = &tomb.Tomb{}

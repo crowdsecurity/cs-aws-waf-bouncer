@@ -30,6 +30,7 @@ type AclConfig struct {
 	Scope          string `yaml:"scope"`
 	IpsetPrefix    string `yaml:"ipset_prefix"`
 	FallbackAction string `yaml:"fallback_action"`
+	AWSProfile     string `yaml:"aws_profile"`
 }
 
 var validActions = []string{"ban", "captcha"}
@@ -76,6 +77,8 @@ func getConfigFromEnv(config *bouncerConfig) {
 					acl.IpsetPrefix = value
 				case "FALLBACK_ACTION":
 					acl.FallbackAction = value
+				case "AWS_PROFILE":
+					acl.AWSProfile = value
 				}
 			} else {
 				switch key {
@@ -132,6 +135,10 @@ func newConfig(configPath string) (bouncerConfig, error) {
 		config.LogMedia = "stdout"
 	}
 
+	if config.LogLevel == 0 {
+		config.LogLevel = log.InfoLevel
+	}
+
 	if err := types.SetDefaultLoggerConfig(config.LogMedia, config.LogDir, config.LogLevel, 10, 2, 1, aws.Bool(true)); err != nil {
 		log.Fatal(err.Error())
 	}
@@ -145,9 +152,7 @@ func newConfig(configPath string) (bouncerConfig, error) {
 	if config.UpdateFrequency == "" {
 		config.UpdateFrequency = "10s"
 	}
-	/*if config.LogLevel == "" {
-		config.LogLevel = "INFO"
-	}*/
+
 	if len(config.WebACLConfig) == 0 {
 		return bouncerConfig{}, fmt.Errorf("waf_config is required")
 	}
