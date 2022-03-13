@@ -19,9 +19,6 @@ A bouncer for AWS WAF.
 The bouncer syncs the decisions made by CrowdSec to one or multiple AWS WAF Web ACL.
 
 Supports ban and captcha decisions on IP or countries.
-
-A bouncer that syncs the decisions made by CrowdSec with CloudFlare's firewall. Manages multi user, multi account, multi zone setup. Supports IP, Country and AS scoped decisions.
-
 # Documentation
 
 Please follow the [official documentation](https://docs.crowdsec.net/docs/bouncers/aws-waf).
