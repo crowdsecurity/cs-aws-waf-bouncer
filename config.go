@@ -35,21 +35,104 @@ type AclConfig struct {
 var validActions = []string{"ban", "captcha"}
 var validScopes = []string{"REGIONAL", "CLOUDFRONT"}
 
+func getConfigFromEnv(config *bouncerConfig) {
+	var key string
+	var value string
+	var acl *AclConfig
+	acls := make(map[byte]*AclConfig, 0)
+
+	for _, env := range os.Environ() {
+		if strings.HasPrefix(env, "BOUNCER_") {
+			s := strings.Split(env, "=")
+			if len(s) == 2 {
+				key = strings.Split(env, "=")[0]
+				value = strings.Split(env, "=")[1]
+			} else {
+				log.Warnf("Invalid environment variable: %s", env)
+				continue
+			}
+			if strings.HasPrefix(key, "BOUNCER_WAF_CONFIG_") {
+				k2 := strings.TrimPrefix(key, "BOUNCER_WAF_CONFIG_")
+				if k2[0] < '0' || k2[0] > '9' || len(k2) < 3 {
+					log.Warnf("Invalid name for %s: BOUNCER_WAF_CONFIG_* must be in the form BOUNCER_WAF_CONFIG_0_XXX, BOUNCER_WAF_CONFIG_1_XXX", key)
+				}
+				if _, ok := acls[k2[0]]; !ok {
+					acl = &AclConfig{}
+					acls[k2[0]] = acl
+				} else {
+					acl = acls[k2[0]]
+				}
+				k2 = k2[2:]
+				switch k2 {
+				case "WEB_ACL_NAME":
+					acl.WebACLName = value
+				case "RULE_GROUP_NAME":
+					acl.RuleGroupName = value
+				case "REGION":
+					acl.Region = value
+				case "SCOPE":
+					acl.Scope = value
+				case "IPSET_PREFIX":
+					acl.IpsetPrefix = value
+				case "FALLBACK_ACTION":
+					acl.FallbackAction = value
+				}
+			} else {
+				switch key {
+				case "BOUNCER_API_KEY":
+					config.APIKey = value
+				case "BOUNCER_API_URL":
+					config.APIUrl = value
+				case "BOUNCER_UPDATE_FREQUENCY":
+					config.UpdateFrequency = value
+				case "BOUNCER_INSECURE_SKIP_VERIFY":
+					config.InsecureSkipVerify = value == "true"
+				case "BOUNCER_DAEMON":
+					config.Daemon = value == "true"
+				case "BOUNCER_LOG_LEVEL":
+					level, err := log.ParseLevel(value)
+					if err != nil {
+						log.Warnf("Invalid log level: %s, using INFO", value)
+						config.LogLevel = log.InfoLevel
+					} else {
+						config.LogLevel = level
+					}
+				case "BOUNCER_LOG_MEDIA":
+					config.LogMedia = value
+				case "BOUNCER_LOG_DIR":
+					config.LogDir = value
+				}
+			}
+		}
+	}
+	for _, v := range acls {
+		config.WebACLConfig = append(config.WebACLConfig, *v)
+	}
+}
+
 func newConfig(configPath string) (bouncerConfig, error) {
 	var config bouncerConfig
-
-	content, err := os.ReadFile(configPath)
 	ipsetPrefix := make(map[string]bool)
 	ruleGroupNames := make(map[string]bool)
-	if err != nil {
-		return bouncerConfig{}, err
-	}
-	err = yaml.UnmarshalStrict(content, &config)
-	if err != nil {
-		return bouncerConfig{}, err
+
+	if configPath != "" {
+		content, err := os.ReadFile(configPath)
+		if err != nil {
+			return bouncerConfig{}, err
+		}
+		err = yaml.UnmarshalStrict(content, &config)
+		if err != nil {
+			return bouncerConfig{}, err
+		}
 	}
 
-	if err = types.SetDefaultLoggerConfig(config.LogMedia, config.LogDir, config.LogLevel, 10, 2, 1, aws.Bool(true)); err != nil {
+	getConfigFromEnv(&config)
+
+	if config.LogMedia == "" {
+		config.LogMedia = "stdout"
+	}
+
+	if err := types.SetDefaultLoggerConfig(config.LogMedia, config.LogDir, config.LogLevel, 10, 2, 1, aws.Bool(true)); err != nil {
 		log.Fatal(err.Error())
 	}
 
