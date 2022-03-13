@@ -95,7 +95,7 @@ func (w WAF) CreateRuleGroup(ruleGroupName string) error {
 	}
 
 	for {
-		w.logger.Info("before create rule group")
+		w.logger.Trace("before create rule group")
 		r, err := w.client.CreateRuleGroup(&wafv2.CreateRuleGroupInput{
 			Name:  aws.String(ruleGroupName),
 			Rules: rules,
@@ -384,16 +384,13 @@ func (w WAF) AddIpSetToACL(acl *wafv2.WebACL, setARN string, token *string, ipTy
 	rules := make([]*wafv2.Rule, 0)
 
 	for _, rule := range acl.Rules {
-		//	if *rule.Name != w.config.RuleName+"-"+ipType {
 		if *rule.Name != "crowdsec-blocklist-"+ipType {
 			rules = append(rules, rule)
 		}
 	}
 
 	rule := &wafv2.Rule{
-		//Name:   aws.String(w.config.RuleName + "-" + ipType),
 		Name: aws.String("crowdsec-blocklist-" + ipType),
-		//Action: w.getRuleAction(),
 		Statement: &wafv2.Statement{
 			IPSetReferenceStatement: &wafv2.IPSetReferenceStatement{
 				ARN: aws.String(setARN),
@@ -529,15 +526,6 @@ func (w WAF) WaitForIpSet(setName string) error {
 		}
 		return nil
 	}
-}
-
-func (w WAF) UpdateCountries(add []*string, delete []*string) error {
-	_, _, err := w.GetWebACL(w.config.WebACLName, w.aclsInfo[w.config.WebACLName].Id)
-	if err != nil {
-		return errors.Wrapf(err, "Error getting ACL %s", w.config.WebACLName)
-	}
-
-	return nil
 }
 
 func (w WAF) Init() error {
@@ -737,6 +725,14 @@ func (w WAF) UpdateGeoSet(d Decisions) error {
 	countriesban = append(countriesban, d.countriesAdd["ban"]...)
 	countriesCaptcha = append(countriesCaptcha, d.countriesAdd["captcha"]...)
 
+	if len(d.countriesAdd["fallback"]) > 0 {
+		if w.config.FallbackAction == "ban" {
+			countriesban = append(countriesban, d.countriesAdd["fallback"]...)
+		} else {
+			countriesCaptcha = append(countriesCaptcha, d.countriesAdd["fallback"]...)
+		}
+	}
+
 	if ruleBan == nil && len(countriesban) > 0 {
 		w.logger.Infof("Creating new rule for countries ban")
 		//we don't already have a geomatch rule in the rule group, create it
@@ -757,6 +753,11 @@ func (w WAF) UpdateGeoSet(d Decisions) error {
 		countriesban = append(countriesban, ruleBan.Statement.GeoMatchStatement.CountryCodes...)
 		for _, c := range d.countriesDel["ban"] {
 			countriesban = removesStringPtr(countriesban, *c)
+		}
+		if len(d.countriesDel["fallback"]) > 0 && w.config.FallbackAction == "ban" {
+			for _, c := range d.countriesDel["fallback"] {
+				countriesban = removesStringPtr(countriesban, *c)
+			}
 		}
 		w.logger.Debugf("Countries ban: %+v", countriesban)
 		if len(countriesCaptcha) == 0 {
@@ -787,6 +788,11 @@ func (w WAF) UpdateGeoSet(d Decisions) error {
 		countriesCaptcha = append(countriesCaptcha, ruleCaptcha.Statement.GeoMatchStatement.CountryCodes...)
 		for _, c := range d.countriesDel["captcha"] {
 			countriesCaptcha = removesStringPtr(countriesCaptcha, *c)
+		}
+		if len(d.countriesDel["fallback"]) > 0 && w.config.FallbackAction == "captcha" {
+			for _, c := range d.countriesDel["fallback"] {
+				countriesCaptcha = removesStringPtr(countriesCaptcha, *c)
+			}
 		}
 		w.logger.Debugf("Countries captcha: %+v", countriesCaptcha)
 		if len(countriesCaptcha) == 0 {

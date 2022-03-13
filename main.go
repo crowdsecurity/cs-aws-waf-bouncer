@@ -32,7 +32,8 @@ var t *tomb.Tomb = &tomb.Tomb{}
 func signalHandler() {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan,
-		syscall.SIGTERM)
+		syscall.SIGTERM,
+		syscall.SIGINT)
 	go func() {
 		<-signalChan
 		log.Info("Received SIGTERM, exiting")
@@ -203,7 +204,7 @@ func main() {
 				log.Info("tomb is dead")
 				return nil
 			case decisions := <-bouncer.Stream:
-				log.Info("got decisions")
+				log.Info("Polling decisions")
 
 				d := processDecisions(decisions)
 				for _, w := range wafInstances {
