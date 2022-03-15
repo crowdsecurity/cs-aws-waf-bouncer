@@ -52,12 +52,12 @@ release: build
 	@mkdir $(RELDIR)/
 	@cp $(BINARY_NAME) $(RELDIR)/
 	@cp -R ./config $(RELDIR)/
-#	@cp ./scripts/install.sh $(RELDIR)/
-#	@cp ./scripts/uninstall.sh $(RELDIR)/
-#	@cp ./scripts/upgrade.sh $(RELDIR)/
-#	@chmod +x $(RELDIR)/install.sh
-#	@chmod +x $(RELDIR)/uninstall.sh
-#	@chmod +x $(RELDIR)/upgrade.sh
+	@cp ./scripts/install.sh $(RELDIR)/
+	@cp ./scripts/uninstall.sh $(RELDIR)/
+	@cp ./scripts/upgrade.sh $(RELDIR)/
+	@chmod +x $(RELDIR)/install.sh
+	@chmod +x $(RELDIR)/uninstall.sh
+	@chmod +x $(RELDIR)/upgrade.sh
 	@tar cvzf crowdsec-aws-waf-bouncer-$(GOOS)-$(GOARCH).tgz $(RELDIR)
 
 release_static: static
