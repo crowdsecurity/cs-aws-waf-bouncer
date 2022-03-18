@@ -515,7 +515,7 @@ func (w WAF) WaitForIpSet(setName string) error {
 				if maxRetries == 0 {
 					return fmt.Errorf("IPSet %s still not created, giving up", setName)
 				}
-				w.logger.Info("IPSet %s still not created, waiting", setName)
+				w.logger.Infof("IPSet %s still not created, waiting", setName)
 				maxRetries--
 				time.Sleep(time.Second * 2)
 				continue
