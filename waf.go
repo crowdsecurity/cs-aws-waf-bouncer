@@ -623,17 +623,9 @@ func (w WAF) UpdateSetsContent(d Decisions) error {
 			action = strings.ToLower(w.config.FallbackAction)
 		}
 		setName := fmt.Sprintf("%s-IPV4-%s", w.config.IpsetPrefix, action)
-		switch action {
-		case "captcha":
-			err = w.UpdateIpSet(setName, ips, []*string{})
-			if err != nil {
-				w.logger.Errorf("Failed to update IPv4 IPSet %s: %s", setName, err)
-			}
-		case "ban":
-			err = w.UpdateIpSet(setName, ips, []*string{})
-			if err != nil {
-				w.logger.Errorf("Failed to update IPv4 IPSet %s: %s", setName, err)
-			}
+		err = w.UpdateIpSet(setName, ips, []*string{})
+		if err != nil {
+			w.logger.Errorf("Failed to update IPv4 IPSet %s: %s", setName, err)
 		}
 	}
 
@@ -642,17 +634,9 @@ func (w WAF) UpdateSetsContent(d Decisions) error {
 			action = strings.ToLower(w.config.FallbackAction)
 		}
 		setName := fmt.Sprintf("%s-IPV4-%s", w.config.IpsetPrefix, action)
-		switch action {
-		case "captcha":
-			err = w.UpdateIpSet(setName, []*string{}, ips)
-			if err != nil {
-				w.logger.Errorf("Failed to update IPv4 IPSet %s: %s", setName, err)
-			}
-		case "ban":
-			err = w.UpdateIpSet(setName, []*string{}, ips)
-			if err != nil {
-				w.logger.Errorf("Failed to update IPv4 IPSet %s: %s", setName, err)
-			}
+		err = w.UpdateIpSet(setName, []*string{}, ips)
+		if err != nil {
+			w.logger.Errorf("Failed to update IPv4 IPSet %s: %s", setName, err)
 		}
 	}
 
@@ -661,17 +645,9 @@ func (w WAF) UpdateSetsContent(d Decisions) error {
 			action = strings.ToLower(w.config.FallbackAction)
 		}
 		setName := fmt.Sprintf("%s-IPV6-%s", w.config.IpsetPrefix, action)
-		switch action {
-		case "captcha":
-			err = w.UpdateIpSet(setName, ips, []*string{})
-			if err != nil {
-				w.logger.Errorf("Failed to update IPv6 IPSet %s: %s", setName, err)
-			}
-		case "ban":
-			err = w.UpdateIpSet(setName, ips, []*string{})
-			if err != nil {
-				w.logger.Errorf("Failed to update IPv6 IPSet %s: %s", setName, err)
-			}
+		err = w.UpdateIpSet(setName, ips, []*string{})
+		if err != nil {
+			w.logger.Errorf("Failed to update IPv6 IPSet %s: %s", setName, err)
 		}
 	}
 
@@ -680,17 +656,9 @@ func (w WAF) UpdateSetsContent(d Decisions) error {
 			action = strings.ToLower(w.config.FallbackAction)
 		}
 		setName := fmt.Sprintf("%s-IPV6-%s", w.config.IpsetPrefix, action)
-		switch action {
-		case "captcha":
-			err = w.UpdateIpSet(setName, []*string{}, ips)
-			if err != nil {
-				w.logger.Errorf("Failed to update IPv6 IPSet %s: %s", setName, err)
-			}
-		case "ban":
-			err = w.UpdateIpSet(setName, []*string{}, ips)
-			if err != nil {
-				w.logger.Errorf("Failed to update IPv6 IPSet %s: %s", setName, err)
-			}
+		err = w.UpdateIpSet(setName, []*string{}, ips)
+		if err != nil {
+			w.logger.Errorf("Failed to update IPv6 IPSet %s: %s", setName, err)
 		}
 	}
 
