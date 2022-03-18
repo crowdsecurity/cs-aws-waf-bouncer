@@ -1,0 +1,23 @@
+#!/usr/bin/make -f
+
+export DEB_VERSION=$(shell dpkg-parsechangelog | egrep '^Version:' | cut -f 2 -d ' ')
+export BUILD_VERSION=v${DEB_VERSION}-debian-pragmatic
+export GO111MODULE=on
+
+
+%:
+	dh $@
+
+override_dh_systemd_start:
+	echo "Not running dh_systemd_start"
+override_dh_auto_clean:
+override_dh_auto_test:
+override_dh_auto_build:
+override_dh_auto_install:
+	make
+	mkdir -p debian/crowdsec-aws-waf-bouncer/usr/bin
+	cp crowdsec-aws-waf-bouncer  debian/crowdsec-aws-waf-bouncer/usr/bin
+	mkdir -p debian/crowdsec-aws-waf-bouncer/etc/systemd/system/
+	mkdir -p debian/crowdsec-aws-waf-bouncer/etc/crowdsec/bouncers/
+	BIN=/usr/bin/crowdsec-aws-waf-bouncer CFG=/etc/crowdsec/bouncers envsubst < config/crowdsec-aws-waf-bouncer.service >  debian/crowdsec-aws-waf-bouncer/etc/systemd/system/crowdsec-aws-waf-bouncer.service
+	cp config/crowdsec-aws-waf-bouncer.yaml debian/crowdsec-aws-waf-bouncer/etc/crowdsec/bouncers/

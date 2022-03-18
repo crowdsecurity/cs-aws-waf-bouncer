@@ -1,0 +1,38 @@
+
+systemctl daemon-reload
+
+
+START=0
+
+if [ "$1" = "configure" ] && [ "$2" = "" ]; then
+
+    type cscli
+
+    if [ "$?" -eq "0" ] ; then
+        START=1
+        echo "cscli/crowdsec is present, generating API key"
+        unique=`date +%s`
+        API_KEY=`cscli -oraw bouncers add AWS-WAF-${unique}`
+        if [ $? -eq 1 ] ; then
+            echo "failed to create API token, service won't be started."
+            START=0
+            API_KEY="<API_KEY>"
+        else
+            echo "API Key : ${API_KEY}"
+        fi
+
+        TMP=`mktemp -p /tmp/`
+        cp /etc/crowdsec/bouncers/crowdsec-aws-waf-bouncer.yaml ${TMP}
+        API_KEY=${API_KEY} envsubst < ${TMP} > /etc/crowdsec/bouncers/crowdsec-aws-waf-bouncer.yaml
+        rm ${TMP}
+    fi
+else
+    START=1
+fi
+
+
+if [ ${START} -eq 0 ] ; then
+    echo "no api key was generated, you can generate one on your LAPI Server by running 'cscli bouncers add <bouncer_name>' and add it to '/etc/crowdsec/bouncers/crowdsec-aws-waf-bouncer.yaml'"
+fi
+
+echo "Please configure your AWS WAF ACL in '/etc/crowdsec/bouncers/crowdsec-aws-waf-bouncer.yaml' and start the bouncer via 'sudo systemctl start crowdsec-aws-waf-bouncer' "

@@ -13,3 +13,7 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+
+crowdsec-aws-waf-bouncer
+cs-aws-waf-bouncer.yaml
+cs-aws-waf-bouncer
