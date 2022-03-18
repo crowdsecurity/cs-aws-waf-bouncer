@@ -1,0 +1,12 @@
+name: golangci-lint
+jobs:
+  golangci:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          args: --issues-exit-code=0 --timeout 5m
+          only-new-issues: true
