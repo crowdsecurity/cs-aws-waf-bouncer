@@ -12,6 +12,8 @@ BuildRequires:  git
 BuildRequires:  make
 %{?fc33:BuildRequires: systemd-rpm-macros}
 
+Requires: gettext
+
 %define debug_package %{nil}
 
 %description
@@ -80,7 +82,7 @@ if [ ${START} -eq 0 ] ; then
     echo "no api key was generated, you can generate one on your LAPI Server by running 'cscli bouncers add <bouncer_name>' and add it to '/etc/crowdsec/bouncers/crowdsec-aws-waf-bouncer.yaml'"
 fi
 
-echo "Please configure your AWS WAF ACL in '/etc/crowdsec/bouncers/crowdsec-aws-waf-bouncer.yaml' and start the bouncer via 'sudo systemctl start crowdsec-aws-waf-bouncer' 
+echo "Please configure your AWS WAF ACL in '/etc/crowdsec/bouncers/crowdsec-aws-waf-bouncer.yaml' and start the bouncer via 'sudo systemctl start crowdsec-aws-waf-bouncer'" 
 
  
 %changelog

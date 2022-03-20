@@ -4,6 +4,7 @@ Build-Depends: debhelper, bash
 
 Package: crowdsec-aws-waf-bouncer
 Provides: crowdsec-aws-waf-bouncer
+Depends: gettext-base
 Description: AWS WAF bouncer for Crowdsec
 Architecture: any
 
