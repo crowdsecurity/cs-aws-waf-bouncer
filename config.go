@@ -3,11 +3,13 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/crowdsecurity/crowdsec/pkg/types"
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/natefinch/lumberjack.v2"
 	"gopkg.in/yaml.v2"
 )
 
@@ -20,6 +22,10 @@ type bouncerConfig struct {
 	LogLevel           log.Level   `yaml:"log_level"`
 	LogMedia           string      `yaml:"log_media"`
 	LogDir             string      `yaml:"log_dir"`
+	LogMaxSize         int         `yaml:"log_max_size"`
+	LogMaxAge          int         `yaml:"log_max_age"`
+	LogMaxFiles        int         `yaml:"log_max_backups"`
+	CompressLogs       *bool       `yaml:"compress_logs"`
 	WebACLConfig       []AclConfig `yaml:"waf_config"`
 }
 
@@ -40,6 +46,7 @@ func getConfigFromEnv(config *bouncerConfig) {
 	var key string
 	var value string
 	var acl *AclConfig
+	var err error
 	acls := make(map[byte]*AclConfig, 0)
 
 	for _, env := range os.Environ() {
@@ -104,6 +111,26 @@ func getConfigFromEnv(config *bouncerConfig) {
 					config.LogMedia = value
 				case "BOUNCER_LOG_DIR":
 					config.LogDir = value
+				case "BOUNCER_LOG_MAX_SIZE":
+					config.LogMaxSize, err = strconv.Atoi(value)
+					if err != nil {
+						log.Warnf("Invalid log max size from env: %s, using 40", value)
+						config.LogMaxSize = 40
+					}
+				case "BOUNCER_LOG_MAX_AGE":
+					config.LogMaxAge, err = strconv.Atoi(value)
+					if err != nil {
+						log.Warnf("Invalid log max age from env: %s, using 7", value)
+						config.LogMaxAge = 7
+					}
+				case "BOUNCER_LOG_MAX_FILES":
+					config.LogMaxFiles, err = strconv.Atoi(value)
+					if err != nil {
+						log.Warnf("Invalid log max files from env: %s, using 7", value)
+						config.LogMaxFiles = 7
+					}
+				case "BOUNCER_COMPRESS_LOGS":
+					config.CompressLogs = aws.Bool(value == "true")
 				}
 			}
 		}
@@ -139,8 +166,39 @@ func newConfig(configPath string) (bouncerConfig, error) {
 		config.LogLevel = log.InfoLevel
 	}
 
-	if err := types.SetDefaultLoggerConfig(config.LogMedia, config.LogDir, config.LogLevel, 10, 2, 1, aws.Bool(true)); err != nil {
+	if err := types.SetDefaultLoggerConfig(config.LogMedia, config.LogDir, config.LogLevel, config.LogMaxSize, config.LogMaxFiles, config.LogMaxAge, config.CompressLogs); err != nil {
 		log.Fatal(err.Error())
+	}
+
+	if config.LogMedia == "file" {
+		if config.LogDir == "" {
+			config.LogDir = "/var/log/"
+		}
+		_maxsize := 40
+		if config.LogMaxSize != 0 {
+			_maxsize = config.LogMaxSize
+		}
+		_maxfiles := 3
+		if config.LogMaxFiles != 0 {
+			_maxfiles = config.LogMaxFiles
+		}
+		_maxage := 30
+		if config.LogMaxAge != 0 {
+			_maxage = config.LogMaxAge
+		}
+		_compress := true
+		if config.CompressLogs != nil {
+			_compress = *config.CompressLogs
+		}
+		logOutput := &lumberjack.Logger{
+			Filename:   config.LogDir + "/crowdsec-aws-waf-bouncer.log",
+			MaxSize:    _maxsize,
+			MaxBackups: _maxfiles,
+			MaxAge:     _maxage,
+			Compress:   _compress,
+		}
+		log.SetOutput(logOutput)
+		log.SetFormatter(&log.TextFormatter{TimestampFormat: "02-01-2006 15:04:05", FullTimestamp: true})
 	}
 
 	if config.APIKey == "" {
