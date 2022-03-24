@@ -39,7 +39,7 @@ func (im *IPSetManager) Commit() error {
 	return nil
 }
 
-func (im *IPSetManager) AddIp(ip string, decisionType string) error {
+func (im *IPSetManager) AddIp(ip string, decisionType string) {
 	var ipType string
 	if strings.Contains(ip, ":") {
 		ipType = "IPV6"
@@ -51,9 +51,10 @@ func (im *IPSetManager) AddIp(ip string, decisionType string) error {
 		im.logger.Info("could not find empty set, creating new set")
 		ipset = NewIpSet(im.setPrefix, ipType, decisionType, im.scope, im.client)
 		im.IPSets = append(im.IPSets, ipset)
-		return ipset.Add(ip)
+		ipset.Add(ip)
+		return
 	}
-	return ipset.Add(ip)
+	ipset.Add(ip)
 }
 
 func (im *IPSetManager) DeleteIp(ip string, decisionType string) {

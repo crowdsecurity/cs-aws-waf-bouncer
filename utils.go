@@ -4,15 +4,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/wafv2"
 )
 
-func containsStringPtr(slice []*string, s string) bool {
-	for _, item := range slice {
-		if *item == s {
-			return true
-		}
-	}
-	return false
-}
-
 func removesStringPtr(slice []*string, s string) []*string {
 	for i, item := range slice {
 		if *item == s {

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/wafv2"
 	"github.com/google/uuid"
@@ -23,22 +21,20 @@ type WAFIpSet struct {
 	logger       *log.Entry
 }
 
-func (w *WAFIpSet) Add(ip string) error {
+func (w *WAFIpSet) Add(ip string) {
 	if w.Size() >= 10000 {
-		return fmt.Errorf("IP set %s is full", w.name)
+		return
 	}
 	if w.Contains(ip) {
-		return nil
+		return
 	}
 	w.ips = append(w.ips, ip)
 	w.stale = true
-	return nil
 }
 
-func (w *WAFIpSet) Remove(ip string) error {
+func (w *WAFIpSet) Remove(ip string) {
 	w.ips = removesString(w.ips, ip)
 	w.stale = true
-	return nil
 }
 
 func (w *WAFIpSet) Contains(ip string) bool {
