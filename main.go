@@ -26,7 +26,7 @@ type Decisions struct {
 	countriesDel map[string][]*string
 }
 
-var wafInstances []WAF = make([]WAF, 0)
+var wafInstances []*WAF = make([]*WAF, 0)
 var t *tomb.Tomb = &tomb.Tomb{}
 
 func signalHandler() {
