@@ -7,6 +7,7 @@ require (
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf
 	github.com/crowdsecurity/crowdsec v1.3.0
 	github.com/crowdsecurity/go-cs-bouncer v0.0.0-20220222102709-de69a955c07b
+	github.com/google/uuid v1.3.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.8.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0

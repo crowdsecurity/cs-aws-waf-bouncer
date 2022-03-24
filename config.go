@@ -30,17 +30,20 @@ type bouncerConfig struct {
 }
 
 type AclConfig struct {
-	WebACLName     string `yaml:"web_acl_name"`
-	RuleGroupName  string `yaml:"rule_group_name"`
-	Region         string `yaml:"region"`
-	Scope          string `yaml:"scope"`
-	IpsetPrefix    string `yaml:"ipset_prefix"`
-	FallbackAction string `yaml:"fallback_action"`
-	AWSProfile     string `yaml:"aws_profile"`
+	WebACLName       string `yaml:"web_acl_name"`
+	RuleGroupName    string `yaml:"rule_group_name"`
+	Region           string `yaml:"region"`
+	Scope            string `yaml:"scope"`
+	IpsetPrefix      string `yaml:"ipset_prefix"`
+	FallbackAction   string `yaml:"fallback_action"`
+	AWSProfile       string `yaml:"aws_profile"`
+	IPHeader         string `yaml:"ip_header"`
+	IPHeaderPosition string `yaml:"ip_header_position"`
 }
 
 var validActions = []string{"ban", "captcha"}
 var validScopes = []string{"REGIONAL", "CLOUDFRONT"}
+var validIpHeaderPosition = []string{"FIRST", "LAST", "ANY"}
 
 func getConfigFromEnv(config *bouncerConfig) {
 	var key string
@@ -86,6 +89,10 @@ func getConfigFromEnv(config *bouncerConfig) {
 					acl.FallbackAction = value
 				case "AWS_PROFILE":
 					acl.AWSProfile = value
+				case "IP_HEADER":
+					acl.IPHeader = value
+				case "IP_HEADER_POSITION":
+					acl.IPHeaderPosition = value
 				}
 			} else {
 				switch key {
@@ -227,6 +234,15 @@ func newConfig(configPath string) (bouncerConfig, error) {
 		if c.Scope == "" {
 			return bouncerConfig{}, fmt.Errorf("scope is required")
 		}
+
+		if c.IPHeader != "" && c.IPHeaderPosition == "" {
+			return bouncerConfig{}, fmt.Errorf("ip_header_position is required when ip_header is set")
+		}
+
+		if c.IPHeaderPosition != "" && !contains(validIpHeaderPosition, c.IPHeaderPosition) {
+			return bouncerConfig{}, fmt.Errorf("ip_header_position must be one of %v", validIpHeaderPosition)
+		}
+
 		if !contains(validScopes, c.Scope) {
 			return bouncerConfig{}, fmt.Errorf("scope must be one of %v", validScopes)
 		}
