@@ -21,4 +21,4 @@ The bouncer syncs the decisions made by CrowdSec to one or multiple AWS WAF Web 
 Supports ban and captcha decisions on IP or countries.
 # Documentation
 
-Please follow the [official documentation](https://docs.crowdsec.net/docs/bouncers/aws-waf).
+Please follow the [official documentation](https://docs.crowdsec.net/docs/next/bouncers/aws_waf/).
