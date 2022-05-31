@@ -39,6 +39,7 @@ type AclConfig struct {
 	AWSProfile       string `yaml:"aws_profile"`
 	IPHeader         string `yaml:"ip_header"`
 	IPHeaderPosition string `yaml:"ip_header_position"`
+	Capacity         int    `yaml:"capacity"`
 }
 
 var validActions = []string{"ban", "captcha"}
@@ -93,6 +94,12 @@ func getConfigFromEnv(config *bouncerConfig) {
 					acl.IPHeader = value
 				case "IP_HEADER_POSITION":
 					acl.IPHeaderPosition = value
+				case "CAPACITY":
+					acl.Capacity, err = strconv.Atoi(value)
+					if err != nil {
+						log.Warnf("Invalid value for %s: %s", key, value)
+						acl.Capacity = 300
+					}
 				}
 			} else {
 				switch key {
@@ -261,6 +268,10 @@ func newConfig(configPath string) (bouncerConfig, error) {
 			return bouncerConfig{}, fmt.Errorf("rule_group_name value must be unique")
 		} else {
 			ruleGroupNames[c.RuleGroupName] = true
+		}
+
+		if c.Capacity == 0 {
+			c.Capacity = 300
 		}
 	}
 	return config, nil
