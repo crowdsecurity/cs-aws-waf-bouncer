@@ -116,7 +116,7 @@ func (w *WAF) CreateRuleGroup(ruleGroupName string) error {
 				},
 			},
 			Scope:    aws.String(w.config.Scope),
-			Capacity: aws.Int64(300), //FIXME: update it dynamically
+			Capacity: aws.Int64(int64(w.config.Capacity)), //FIXME: Automatically set capacity if not provided by the user
 			VisibilityConfig: &wafv2.VisibilityConfig{
 				SampledRequestsEnabled:   aws.Bool(false),
 				CloudWatchMetricsEnabled: aws.Bool(false),
