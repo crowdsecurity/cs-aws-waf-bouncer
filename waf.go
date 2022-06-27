@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -24,6 +25,7 @@ type WAF struct {
 	t                *tomb.Tomb
 	ipsetManager     *IPSetManager
 	visibilityConfig *wafv2.VisibilityConfig
+	lock             sync.Mutex
 }
 
 type IpSet struct {
@@ -435,6 +437,8 @@ func (w *WAF) CleanupAcl(acl *wafv2.WebACL, token *string) error {
 
 func (w *WAF) Cleanup() error {
 	var err error
+	w.lock.Lock()
+	defer w.lock.Unlock()
 	w.aclsInfo, w.setsInfos, w.ruleGroupsInfos, err = w.ListRessources()
 	if err != nil {
 		return errors.Wrapf(err, "Failed to list WAF resources")
@@ -689,9 +693,11 @@ func (w *WAF) Process() error {
 			if dontProcess {
 				continue
 			}
+			w.lock.Lock()
 			w.aclsInfo, w.setsInfos, w.ruleGroupsInfos, err = w.ListRessources()
 			if err != nil {
 				w.logger.Errorf("Failed to list ressources: %s", err)
+				w.lock.Unlock()
 				continue
 			}
 			err = w.UpdateSetsContent(decisions)
@@ -703,6 +709,7 @@ func (w *WAF) Process() error {
 			if err != nil {
 				w.logger.Errorf("Failed to update GeoSet: %s", err)
 			}
+			w.lock.Unlock()
 
 		}
 	}
