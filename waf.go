@@ -14,15 +14,16 @@ import (
 )
 
 type WAF struct {
-	config          *AclConfig
-	client          *wafv2.WAFV2
-	setsInfos       map[string]IpSet
-	ruleGroupsInfos map[string]RuleGroup
-	aclsInfo        map[string]Acl
-	logger          *log.Entry
-	decisionsChan   chan Decisions
-	t               *tomb.Tomb
-	ipsetManager    *IPSetManager
+	config           *AclConfig
+	client           *wafv2.WAFV2
+	setsInfos        map[string]IpSet
+	ruleGroupsInfos  map[string]RuleGroup
+	aclsInfo         map[string]Acl
+	logger           *log.Entry
+	decisionsChan    chan Decisions
+	t                *tomb.Tomb
+	ipsetManager     *IPSetManager
+	visibilityConfig *wafv2.VisibilityConfig
 }
 
 type IpSet struct {
@@ -104,6 +105,7 @@ func (w *WAF) ListRuleGroups() (map[string]RuleGroup, error) {
 func (w *WAF) CreateRuleGroup(ruleGroupName string) error {
 
 	maxRetries := 5
+
 	for {
 		w.logger.Trace("before create rule group")
 		r, err := w.client.CreateRuleGroup(&wafv2.CreateRuleGroupInput{
@@ -115,13 +117,9 @@ func (w *WAF) CreateRuleGroup(ruleGroupName string) error {
 					Value: aws.String("true"),
 				},
 			},
-			Scope:    aws.String(w.config.Scope),
-			Capacity: aws.Int64(int64(w.config.Capacity)), //FIXME: Automatically set capacity if not provided by the user
-			VisibilityConfig: &wafv2.VisibilityConfig{
-				SampledRequestsEnabled:   aws.Bool(false),
-				CloudWatchMetricsEnabled: aws.Bool(false),
-				MetricName:               aws.String(ruleGroupName),
-			},
+			Scope:            aws.String(w.config.Scope),
+			Capacity:         aws.Int64(int64(w.config.Capacity)), //FIXME: Automatically set capacity if not provided by the user
+			VisibilityConfig: w.visibilityConfig,
 		})
 		if err != nil {
 			switch err.(type) {
@@ -157,7 +155,7 @@ func (w *WAF) UpdateRuleGroup() error {
 		return nil
 	}
 
-	token, _, err := w.GetRuleGroup(w.config.RuleGroupName)
+	token, rg, err := w.GetRuleGroup(w.config.RuleGroupName)
 
 	if err != nil {
 		return err
@@ -191,16 +189,12 @@ func (w *WAF) UpdateRuleGroup() error {
 			return fmt.Errorf("WAF is not ready yet, giving up")
 		}
 		_, err = w.client.UpdateRuleGroup(&wafv2.UpdateRuleGroupInput{
-			Name:  aws.String(w.config.RuleGroupName),
-			Rules: rules,
-			Scope: aws.String(w.config.Scope),
-			VisibilityConfig: &wafv2.VisibilityConfig{
-				SampledRequestsEnabled:   aws.Bool(false),
-				CloudWatchMetricsEnabled: aws.Bool(false),
-				MetricName:               aws.String(w.config.RuleGroupName),
-			},
-			Id:        aws.String(w.ruleGroupsInfos[w.config.RuleGroupName].Id),
-			LockToken: aws.String(token),
+			Name:             aws.String(w.config.RuleGroupName),
+			Rules:            rules,
+			Scope:            aws.String(w.config.Scope),
+			VisibilityConfig: rg.VisibilityConfig,
+			Id:               aws.String(w.ruleGroupsInfos[w.config.RuleGroupName].Id),
+			LockToken:        aws.String(token),
 		})
 		if err != nil {
 			switch err.(type) {
@@ -780,6 +774,16 @@ func NewWaf(config AclConfig) (*WAF, error) {
 	w.client = client
 	w.config = &config
 	w.t = &tomb.Tomb{}
+
+	metricName := w.config.RuleGroupName
+	if w.config.CloudWatchMetricName != "" {
+		metricName = w.config.CloudWatchMetricName
+	}
+	w.visibilityConfig = &wafv2.VisibilityConfig{
+		SampledRequestsEnabled:   &w.config.SampleRequests,
+		CloudWatchMetricsEnabled: &w.config.CloudWatchEnabled,
+		MetricName:               aws.String(metricName),
+	}
 
 	w.t.Go(w.Process)
 	return w, nil
