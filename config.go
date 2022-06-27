@@ -27,6 +27,9 @@ type bouncerConfig struct {
 	LogMaxFiles        int         `yaml:"log_max_backups"`
 	CompressLogs       *bool       `yaml:"compress_logs"`
 	WebACLConfig       []AclConfig `yaml:"waf_config"`
+	KeyPath            string      `yaml:"key_path"`
+	CertPath           string      `yaml:"cert_path"`
+	CAPath             string      `yaml:"ca_path"`
 }
 
 type AclConfig struct {
@@ -145,7 +148,14 @@ func getConfigFromEnv(config *bouncerConfig) {
 					}
 				case "BOUNCER_COMPRESS_LOGS":
 					config.CompressLogs = aws.Bool(value == "true")
+				case "BOUNCER_CERT_PATH":
+					config.CertPath = value
+				case "BOUNCER_KEY_PATH":
+					config.KeyPath = value
+				case "BOUNCER_CA_PATH":
+					config.CAPath = value
 				}
+
 			}
 		}
 	}
@@ -215,8 +225,8 @@ func newConfig(configPath string) (bouncerConfig, error) {
 		log.SetFormatter(&log.TextFormatter{TimestampFormat: "02-01-2006 15:04:05", FullTimestamp: true})
 	}
 
-	if config.APIKey == "" {
-		return bouncerConfig{}, fmt.Errorf("api_key is required")
+	if config.APIKey == "" && config.CertPath == "" && config.KeyPath == "" {
+		return bouncerConfig{}, fmt.Errorf("api_key or certificates paths are required")
 	}
 	if config.APIUrl == "" {
 		return bouncerConfig{}, fmt.Errorf("api_url is required")

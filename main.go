@@ -160,6 +160,9 @@ func main() {
 		InsecureSkipVerify: aws.Bool(config.InsecureSkipVerify),
 		UserAgent:          fmt.Sprintf("crowdsec-aws-waf-bouncer/%s", version.VersionStr()),
 		Scopes:             []string{"ip", "range", "country"},
+		CertPath:           config.CertPath,
+		KeyPath:            config.KeyPath,
+		CAPath:             config.CAPath,
 	}
 
 	if err := bouncer.Init(); err != nil {
