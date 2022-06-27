@@ -25,9 +25,18 @@ func (im *IPSetManager) FindAvailableSet(ipType string, decisionType string) (*W
 	return nil, fmt.Errorf("no available set found")
 }
 
+func (im *IPSetManager) alreadyInSets(ip string, decisionType string) bool {
+	for _, ipset := range im.IPSets {
+		if ipset.GetDecisionType() == decisionType && ipset.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
 func (im *IPSetManager) Commit() error {
 	for _, ipset := range im.IPSets {
-		im.logger.Infof("checking if set %s is stale", ipset.GetName())
+		im.logger.Debugf("checking if set %s is stale", ipset.GetName())
 		if ipset.IsStale() {
 			im.logger.Infof("set %s is stale, updating it", ipset.GetName())
 			err := ipset.Commit()
@@ -46,6 +55,12 @@ func (im *IPSetManager) AddIp(ip string, decisionType string) {
 	} else {
 		ipType = "IPV4"
 	}
+
+	if im.alreadyInSets(ip, decisionType) {
+		im.logger.Debugf("ip %s already in set, skipping", ip)
+		return
+	}
+
 	ipset, err := im.FindAvailableSet(ipType, decisionType)
 	if err != nil {
 		im.logger.Info("could not find empty set, creating new set")
