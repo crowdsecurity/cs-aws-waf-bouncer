@@ -46,7 +46,7 @@ type AclConfig struct {
 	SampleRequests       bool   `yaml:"sample_requests"`
 }
 
-var validActions = []string{"ban", "captcha"}
+var validActions = []string{"ban", "captcha", "count"}
 var validScopes = []string{"REGIONAL", "CLOUDFRONT"}
 var validIpHeaderPosition = []string{"FIRST", "LAST", "ANY"}
 
@@ -249,6 +249,10 @@ func newConfig(configPath string) (bouncerConfig, error) {
 		if !contains(validActions, action) {
 			return bouncerConfig{}, fmt.Errorf("supported_actions must be a list from %v", validActions)
 		}
+	}
+
+	if len(config.SupportedActions) == 0 {
+		config.SupportedActions = validActions
 	}
 
 	if len(config.WebACLConfig) == 0 {

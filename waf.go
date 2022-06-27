@@ -161,7 +161,13 @@ func (w *WAF) UpdateRuleGroup() error {
 		return err
 	}
 
-	for _, actionType := range []string{"ban", "captcha"} {
+	for _, rule := range rg.Rules {
+		if *rule.Name != "crowdsec-rule-ban" && *rule.Name != "crowdsec-rule-captcha" && *rule.Name != "crowdsec-rule-count" {
+			rules = append(rules, rule)
+		}
+	}
+
+	for _, actionType := range validActions {
 		statement := w.getWafStatement(actionType)
 		if statement != nil {
 			r := &wafv2.Rule{
@@ -277,7 +283,12 @@ func (w *WAF) getRuleAction(actionType string) *wafv2.RuleAction {
 		return &wafv2.RuleAction{
 			Captcha: &wafv2.CaptchaAction{},
 		}
+	case "count":
+		return &wafv2.RuleAction{
+			Count: &wafv2.CountAction{},
+		}
 	}
+
 	return nil
 }
 
@@ -575,15 +586,15 @@ func (w *WAF) UpdateSetsContent(d Decisions) error {
 }
 
 func (w *WAF) UpdateGeoSet(d Decisions) error {
-	var ruleCaptcha *wafv2.Rule
-	var ruleBan *wafv2.Rule
-
-	countriesban := make([]*string, 0)
-	countriesCaptcha := make([]*string, 0)
 
 	if len(d.countriesAdd) == 0 && len(d.countriesDel) == 0 {
 		return nil
 	}
+
+	rules := make(map[string]*wafv2.Rule)
+	decisions := make(map[string][]*string)
+
+	priority := 50
 
 	token, rg, err := w.GetRuleGroup(w.config.RuleGroupName)
 	if err != nil {
@@ -591,109 +602,74 @@ func (w *WAF) UpdateGeoSet(d Decisions) error {
 	}
 
 	for _, rule := range rg.Rules {
-		if *rule.Name == "crowdsec-rule-country-ban" {
-			ruleBan = rule
-		}
-		if *rule.Name == "crowdsec-rule-country-captcha" {
-			ruleCaptcha = rule
-		}
-	}
-
-	countriesban = append(countriesban, d.countriesAdd["ban"]...)
-	countriesCaptcha = append(countriesCaptcha, d.countriesAdd["captcha"]...)
-
-	if len(d.countriesAdd["fallback"]) > 0 {
-		if w.config.FallbackAction == "ban" {
-			countriesban = append(countriesban, d.countriesAdd["fallback"]...)
-		} else {
-			countriesCaptcha = append(countriesCaptcha, d.countriesAdd["fallback"]...)
+		switch *rule.Name {
+		case "crowdsec-rule-country-captcha":
+			rules["captcha"] = rule
+		case "crowdsec-rule-country-ban":
+			rules["ban"] = rule
+		case "crowdsec-rule-country-count":
+			rules["count"] = rule
 		}
 	}
 
-	if ruleBan == nil && len(countriesban) > 0 {
-		w.logger.Infof("Creating new rule for countries ban")
-		//we don't already have a geomatch rule in the rule group, create it
-		ruleBan = &wafv2.Rule{
-			Name: aws.String("crowdsec-rule-country-ban"),
-			Statement: &wafv2.Statement{
-				GeoMatchStatement: &wafv2.GeoMatchStatement{
-					CountryCodes: countriesban,
+	for _, action := range validActions {
+		decisions[action] = make([]*string, 0)
+		decisions[action] = append(decisions[action], d.countriesAdd[action]...)
+		if w.config.FallbackAction == action && len(d.countriesAdd["fallback"]) > 0 {
+			decisions[action] = append(decisions[action], d.countriesAdd["fallback"]...)
+		}
+
+		//We don't currently have a rule for countries for this action
+		if rules[action] == nil && len(decisions[action]) > 0 {
+			w.logger.Infof("Creating rule %s for action %s", "crowdsec-rule-country-"+action, action)
+			rules[action] = &wafv2.Rule{
+				Name: aws.String("crowdsec-rule-country-" + action),
+				Statement: &wafv2.Statement{
+					GeoMatchStatement: &wafv2.GeoMatchStatement{
+						CountryCodes: uniqueStrPtr(decisions[action]),
+					},
 				},
-			},
-			Priority:         aws.Int64(20), //FIXME: get the priority dynamically, but it does not really matter as we managed the rulegroup ourselves
-			VisibilityConfig: rg.VisibilityConfig,
-			Action:           w.getRuleAction("ban"),
-		}
-		rg.Rules = append(rg.Rules, ruleBan)
-	} else if ruleBan != nil {
-		w.logger.Infof("Updating existing rule %s for countries ban", *ruleBan.Name)
-		countriesban = append(countriesban, ruleBan.Statement.GeoMatchStatement.CountryCodes...)
-		for _, c := range d.countriesDel["ban"] {
-			countriesban = removesStringPtr(countriesban, *c)
-		}
-		if len(d.countriesDel["fallback"]) > 0 && w.config.FallbackAction == "ban" {
-			for _, c := range d.countriesDel["fallback"] {
-				countriesban = removesStringPtr(countriesban, *c)
+				Priority:         aws.Int64(int64(priority)), //FIXME: get the priority dynamically, but it does not really matter as we managed the rulegroup ourselves
+				VisibilityConfig: rg.VisibilityConfig,
+				Action:           w.getRuleAction(action),
+			}
+			rg.Rules = append(rg.Rules, rules[action])
+
+		} else if rules[action] != nil { //We have a rule for this action
+			w.logger.Infof("Updating rule %s for action %s", *rules[action].Name, action)
+			decisions[action] = append(decisions[action], rules[action].Statement.GeoMatchStatement.CountryCodes...)
+			for _, c := range d.countriesDel[action] {
+				decisions[action] = removesStringPtr(decisions[action], *c)
+			}
+			if len(d.countriesDel["fallback"]) > 0 && w.config.FallbackAction == action {
+				for _, c := range d.countriesDel["fallback"] {
+					decisions[action] = removesStringPtr(decisions[action], *c)
+				}
 			}
 		}
-		w.logger.Debugf("Countries ban: %+v", countriesban)
-		if len(countriesCaptcha) == 0 {
-			//remove the rule if there are no countries left
-			rg.Rules = removeRuleFromRuleGroup(rg.Rules, *ruleBan.Name)
-		} else {
-			ruleBan.Statement.GeoMatchStatement.CountryCodes = countriesban
+		priority++
+		w.logger.Debugf("Decisions for action %s: %+v", action, decisions[action])
+		if len(decisions[action]) == 0 && rules[action] != nil {
+			w.logger.Infof("Removing rule %s for action %s", *rules[action].Name, action)
+			rg.Rules = removeRuleFromRuleGroup(rg.Rules, *rules[action].Name)
+		} else if len(decisions[action]) > 0 {
+			w.logger.Debugf("Updating rule %s for action %s with countries %v", *rules[action].Name, action, decisions[action])
+			rules[action].Statement.GeoMatchStatement.CountryCodes = uniqueStrPtr(decisions[action])
 		}
 	}
 
-	if ruleCaptcha == nil && len(countriesCaptcha) > 0 {
-		w.logger.Infof("Creating new rule for countries captcha")
-		//we don't already have a geomatch rule in the rule group, create it
-		ruleCaptcha = &wafv2.Rule{
-			Name: aws.String("crowdsec-rule-country-captcha"),
-			Statement: &wafv2.Statement{
-				GeoMatchStatement: &wafv2.GeoMatchStatement{
-					CountryCodes: countriesCaptcha,
-				},
-			},
-			Priority:         aws.Int64(30),
-			VisibilityConfig: rg.VisibilityConfig,
-			Action:           w.getRuleAction("captcha"),
-		}
-		rg.Rules = append(rg.Rules, ruleCaptcha)
-	} else if ruleCaptcha != nil {
-		w.logger.Infof("Updating existing rule %s for countries captcha", *ruleCaptcha.Name)
-		countriesCaptcha = append(countriesCaptcha, ruleCaptcha.Statement.GeoMatchStatement.CountryCodes...)
-		for _, c := range d.countriesDel["captcha"] {
-			countriesCaptcha = removesStringPtr(countriesCaptcha, *c)
-		}
-		if len(d.countriesDel["fallback"]) > 0 && w.config.FallbackAction == "captcha" {
-			for _, c := range d.countriesDel["fallback"] {
-				countriesCaptcha = removesStringPtr(countriesCaptcha, *c)
-			}
-		}
-		w.logger.Debugf("Countries captcha: %+v", countriesCaptcha)
-		if len(countriesCaptcha) == 0 {
-			//remove the rule if there are no countries left
-			rg.Rules = removeRuleFromRuleGroup(rg.Rules, *ruleCaptcha.Name)
-		} else {
-			ruleCaptcha.Statement.GeoMatchStatement.CountryCodes = countriesCaptcha
-		}
+	_, err = w.client.UpdateRuleGroup(&wafv2.UpdateRuleGroupInput{
+		Name:             rg.Name,
+		Rules:            rg.Rules,
+		Scope:            aws.String(w.config.Scope),
+		VisibilityConfig: rg.VisibilityConfig,
+		Id:               rg.Id,
+		LockToken:        aws.String(token),
+	})
+	if err != nil {
+		return errors.Wrapf(err, "Failed to update RuleGroup  %s for geoset update", w.config.WebACLName)
 	}
-
-	if ruleBan != nil || ruleCaptcha != nil {
-		_, err = w.client.UpdateRuleGroup(&wafv2.UpdateRuleGroupInput{
-			Name:             rg.Name,
-			Rules:            rg.Rules,
-			Scope:            aws.String(w.config.Scope),
-			VisibilityConfig: rg.VisibilityConfig,
-			Id:               rg.Id,
-			LockToken:        aws.String(token),
-		})
-		w.logger.Debug("Updated RuleGroup for geomatch")
-		if err != nil {
-			return errors.Wrapf(err, "Failed to update RuleGroup  %s for geoset update", w.config.WebACLName)
-		}
-	}
+	w.logger.Debug("Updated RuleGroup for geomatch")
 
 	return nil
 }
@@ -727,6 +703,7 @@ func (w *WAF) Process() error {
 			if err != nil {
 				w.logger.Errorf("Failed to update GeoSet: %s", err)
 			}
+
 		}
 	}
 }
