@@ -27,6 +27,7 @@ type bouncerConfig struct {
 	LogMaxFiles        int         `yaml:"log_max_backups"`
 	CompressLogs       *bool       `yaml:"compress_logs"`
 	WebACLConfig       []AclConfig `yaml:"waf_config"`
+	SupportedActions   []string    `yaml:"supported_actions"`
 }
 
 type AclConfig struct {
@@ -145,6 +146,8 @@ func getConfigFromEnv(config *bouncerConfig) {
 					}
 				case "BOUNCER_COMPRESS_LOGS":
 					config.CompressLogs = aws.Bool(value == "true")
+				case "BOUNCER_SUPPORTED_ACTIONS":
+					config.SupportedActions = strings.Split(value, ",")
 				}
 			}
 		}
@@ -223,6 +226,12 @@ func newConfig(configPath string) (bouncerConfig, error) {
 	}
 	if config.UpdateFrequency == "" {
 		config.UpdateFrequency = "10s"
+	}
+
+	for _, action := range config.SupportedActions {
+		if !contains(validActions, action) {
+			return bouncerConfig{}, fmt.Errorf("supported_actions must be a list from %v", validActions)
+		}
 	}
 
 	if len(config.WebACLConfig) == 0 {
