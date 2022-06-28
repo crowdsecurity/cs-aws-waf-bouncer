@@ -48,3 +48,17 @@ func removeIpSetFromSlice(sets []*WAFIpSet, ipset *WAFIpSet) []*WAFIpSet {
 	}
 	return sets
 }
+
+func uniqueStrPtr(s []*string) []*string {
+	m := make(map[*string]bool)
+	for _, v := range s {
+		if _, ok := m[v]; !ok {
+			m[v] = true
+		}
+	}
+	var result []*string
+	for k := range m {
+		result = append(result, k)
+	}
+	return result
+}

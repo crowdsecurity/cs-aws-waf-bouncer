@@ -31,19 +31,22 @@ type bouncerConfig struct {
 }
 
 type AclConfig struct {
-	WebACLName       string `yaml:"web_acl_name"`
-	RuleGroupName    string `yaml:"rule_group_name"`
-	Region           string `yaml:"region"`
-	Scope            string `yaml:"scope"`
-	IpsetPrefix      string `yaml:"ipset_prefix"`
-	FallbackAction   string `yaml:"fallback_action"`
-	AWSProfile       string `yaml:"aws_profile"`
-	IPHeader         string `yaml:"ip_header"`
-	IPHeaderPosition string `yaml:"ip_header_position"`
-	Capacity         int    `yaml:"capacity"`
+	WebACLName           string `yaml:"web_acl_name"`
+	RuleGroupName        string `yaml:"rule_group_name"`
+	Region               string `yaml:"region"`
+	Scope                string `yaml:"scope"`
+	IpsetPrefix          string `yaml:"ipset_prefix"`
+	FallbackAction       string `yaml:"fallback_action"`
+	AWSProfile           string `yaml:"aws_profile"`
+	IPHeader             string `yaml:"ip_header"`
+	IPHeaderPosition     string `yaml:"ip_header_position"`
+	Capacity             int    `yaml:"capacity"`
+	CloudWatchEnabled    bool   `yaml:"cloudwatch_enabled"`
+	CloudWatchMetricName string `yaml:"cloudwatch_metric_name"`
+	SampleRequests       bool   `yaml:"sample_requests"`
 }
 
-var validActions = []string{"ban", "captcha"}
+var validActions = []string{"ban", "captcha", "count"}
 var validScopes = []string{"REGIONAL", "CLOUDFRONT"}
 var validIpHeaderPosition = []string{"FIRST", "LAST", "ANY"}
 
@@ -100,6 +103,20 @@ func getConfigFromEnv(config *bouncerConfig) {
 					if err != nil {
 						log.Warnf("Invalid value for %s: %s", key, value)
 						acl.Capacity = 300
+					}
+				case "CLOUDWATCH_ENABLED":
+					acl.CloudWatchEnabled, err = strconv.ParseBool(value)
+					if err != nil {
+						log.Warnf("Invalid value for %s: %s, defaulting to false", key, value)
+						acl.CloudWatchEnabled = false
+					}
+				case "CLOUDWATCH_METRIC_NAME":
+					acl.CloudWatchMetricName = value
+				case "SAMPLE_REQUESTS":
+					acl.SampleRequests, err = strconv.ParseBool(value)
+					if err != nil {
+						log.Warnf("Invalid value for %s: %s, defaulting to false", key, value)
+						acl.SampleRequests = false
 					}
 				}
 			} else {
@@ -232,6 +249,10 @@ func newConfig(configPath string) (bouncerConfig, error) {
 		if !contains(validActions, action) {
 			return bouncerConfig{}, fmt.Errorf("supported_actions must be a list from %v", validActions)
 		}
+	}
+
+	if len(config.SupportedActions) == 0 {
+		config.SupportedActions = validActions
 	}
 
 	if len(config.WebACLConfig) == 0 {
