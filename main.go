@@ -29,6 +29,16 @@ type Decisions struct {
 var wafInstances []*WAF = make([]*WAF, 0)
 var t *tomb.Tomb = &tomb.Tomb{}
 
+func cleanup() {
+	for _, waf := range wafInstances {
+		waf.logger.Infof("Cleaning up ressources")
+		err := waf.Cleanup()
+		if err != nil {
+			log.Errorf("Error cleaning up WAF: %s", err)
+		}
+	}
+}
+
 func signalHandler() {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan,
@@ -37,13 +47,6 @@ func signalHandler() {
 	go func() {
 		<-signalChan
 		log.Info("Received SIGTERM, exiting")
-		for _, waf := range wafInstances {
-			waf.logger.Infof("Cleaning up ressources")
-			err := waf.Cleanup()
-			if err != nil {
-				log.Errorf("Error cleaning up WAF: %s", err)
-			}
-		}
 		t.Kill(nil)
 	}()
 }
@@ -169,22 +172,28 @@ func main() {
 		log.Fatalf(err.Error())
 	}
 
+	defer cleanup()
+
 	for _, wafConfig := range config.WebACLConfig {
 		log.Debugf("Create WAF instance with config: %+v", wafConfig)
 		w, err := NewWaf(wafConfig)
 		if err != nil {
-			log.Fatalf("could not create waf instance: %s", err)
+			log.Errorf("could not create waf instance: %s", err)
+			return
 		}
 		err = w.Init()
 		if err != nil {
-			log.Fatalf("could not initialize waf instance: %s", err)
+			log.Errorf("could not initialize waf instance: %s", err)
 		}
 		wafInstances = append(wafInstances, w)
 	}
 
 	signalHandler()
 
-	go bouncer.Run()
+	t.Go(func() error {
+		bouncer.Run()
+		return fmt.Errorf("stream api init failed")
+	})
 
 	if config.Daemon {
 		sent, err := daemon.SdNotify(false, "READY=1")

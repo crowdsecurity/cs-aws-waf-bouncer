@@ -683,7 +683,6 @@ func (w *WAF) Process() error {
 	for {
 		select {
 		case <-w.t.Dying():
-			w.logger.Info("WAF process is dying")
 			dontProcess = true
 		case <-w.t.Dead():
 			w.logger.Info("WAF process is dead")
