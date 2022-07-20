@@ -37,6 +37,7 @@ func cleanup() {
 			log.Errorf("Error cleaning up WAF: %s", err)
 		}
 	}
+	os.Exit(0)
 }
 
 func signalHandler() {
@@ -48,6 +49,7 @@ func signalHandler() {
 		<-signalChan
 		log.Info("Received SIGTERM, exiting")
 		t.Kill(nil)
+		cleanup()
 	}()
 }
 
@@ -188,7 +190,7 @@ func main() {
 		wafInstances = append(wafInstances, w)
 	}
 
-	signalHandler()
+	go signalHandler()
 
 	t.Go(func() error {
 		bouncer.Run()

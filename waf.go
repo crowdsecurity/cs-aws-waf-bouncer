@@ -679,19 +679,15 @@ func (w *WAF) UpdateGeoSet(d Decisions) error {
 }
 
 func (w *WAF) Process() error {
-	dontProcess := false
 	for {
 		select {
 		case <-w.t.Dying():
-			dontProcess = true
+			return nil
 		case <-w.t.Dead():
 			w.logger.Info("WAF process is dead")
 			return nil
 		case decisions := <-w.decisionsChan:
 			var err error
-			if dontProcess {
-				continue
-			}
 			w.lock.Lock()
 			w.aclsInfo, w.setsInfos, w.ruleGroupsInfos, err = w.ListRessources()
 			if err != nil {
