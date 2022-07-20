@@ -153,7 +153,7 @@ func (w *WAF) UpdateRuleGroup() error {
 	maxRetries := 5
 
 	if len(w.ipsetManager.IPSets) == 0 {
-		w.logger.Infof("No IPSets to add to rule group %s", w.config.RuleGroupName)
+		w.logger.Debugf("No IPSets to add to rule group %s", w.config.RuleGroupName)
 		return nil
 	}
 
