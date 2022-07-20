@@ -29,7 +29,7 @@ type bouncerConfig struct {
 	WebACLConfig       []AclConfig `yaml:"waf_config"`
 	KeyPath            string      `yaml:"key_path"`
 	CertPath           string      `yaml:"cert_path"`
-	CAPath             string      `yaml:"ca_path"`
+	CAPath             string      `yaml:"ca_cert_path"`
 	SupportedActions   []string    `yaml:"supported_actions"`
 }
 
