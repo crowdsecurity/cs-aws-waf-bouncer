@@ -48,7 +48,7 @@ func signalHandler() {
 	}()
 }
 
-func processDecisions(decisions *models.DecisionsStreamResponse) Decisions {
+func processDecisions(decisions *models.DecisionsStreamResponse, supportedActions []string) Decisions {
 	d := Decisions{
 		v4Add:        make(map[string][]*string),
 		v6Add:        make(map[string][]*string),
@@ -60,7 +60,7 @@ func processDecisions(decisions *models.DecisionsStreamResponse) Decisions {
 
 	for _, decision := range decisions.New {
 		decisionType := strings.ToLower(*decision.Type)
-		if decisionType != "ban" && decisionType != "captcha" {
+		if !contains(supportedActions, decisionType) {
 			decisionType = "fallback"
 		}
 		if strings.ToLower(*decision.Scope) == "ip" || strings.ToLower(*decision.Scope) == "range" {
@@ -86,7 +86,7 @@ func processDecisions(decisions *models.DecisionsStreamResponse) Decisions {
 
 	for _, decision := range decisions.Deleted {
 		decisionType := strings.ToLower(*decision.Type)
-		if decisionType != "ban" && decisionType != "captcha" {
+		if !contains(supportedActions, decisionType) {
 			decisionType = "fallback"
 		}
 		if strings.ToLower(*decision.Scope) == "ip" || strings.ToLower(*decision.Scope) == "range" {
@@ -209,7 +209,7 @@ func main() {
 			case decisions := <-bouncer.Stream:
 				log.Info("Polling decisions")
 
-				d := processDecisions(decisions)
+				d := processDecisions(decisions, config.SupportedActions)
 				for _, w := range wafInstances {
 					w.decisionsChan <- d
 				}
