@@ -443,7 +443,8 @@ func (w *WAF) Cleanup() error {
 	for _, acl := range w.acls {
 		aclDetails, token, err := w.GetWebACL(acl, w.aclsInfo[acl].Id)
 		if err != nil {
-			return errors.Wrapf(err, "Failed to get WebACL")
+			log.Errorf("Failed to get ACL %s: %s", acl, err)
+			continue
 		}
 		err = w.CleanupAcl(aclDetails, token)
 		if err != nil {
