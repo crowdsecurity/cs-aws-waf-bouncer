@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"strings"
 	"syscall"
 
@@ -30,6 +31,10 @@ var wafInstances []*WAF = make([]*WAF, 0)
 var t *tomb.Tomb = &tomb.Tomb{}
 
 func cleanup() {
+	if r := recover(); r != nil {
+		log.Errorf("panic: %s", r)
+		log.Errorf("%s", debug.Stack())
+	}
 	for _, waf := range wafInstances {
 		waf.logger.Infof("Cleaning up ressources")
 		err := waf.Cleanup()
@@ -191,7 +196,6 @@ func main() {
 	}
 
 	go signalHandler()
-
 	t.Go(func() error {
 		bouncer.Run()
 		return fmt.Errorf("stream api init failed")

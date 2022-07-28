@@ -34,19 +34,20 @@ type bouncerConfig struct {
 }
 
 type AclConfig struct {
-	WebACLName           string `yaml:"web_acl_name"`
-	RuleGroupName        string `yaml:"rule_group_name"`
-	Region               string `yaml:"region"`
-	Scope                string `yaml:"scope"`
-	IpsetPrefix          string `yaml:"ipset_prefix"`
-	FallbackAction       string `yaml:"fallback_action"`
-	AWSProfile           string `yaml:"aws_profile"`
-	IPHeader             string `yaml:"ip_header"`
-	IPHeaderPosition     string `yaml:"ip_header_position"`
-	Capacity             int    `yaml:"capacity"`
-	CloudWatchEnabled    bool   `yaml:"cloudwatch_enabled"`
-	CloudWatchMetricName string `yaml:"cloudwatch_metric_name"`
-	SampleRequests       bool   `yaml:"sample_requests"`
+	WebACLName           string   `yaml:"web_acl_name"`
+	WebACLNames          []string `yaml:"web_acl_names"`
+	RuleGroupName        string   `yaml:"rule_group_name"`
+	Region               string   `yaml:"region"`
+	Scope                string   `yaml:"scope"`
+	IpsetPrefix          string   `yaml:"ipset_prefix"`
+	FallbackAction       string   `yaml:"fallback_action"`
+	AWSProfile           string   `yaml:"aws_profile"`
+	IPHeader             string   `yaml:"ip_header"`
+	IPHeaderPosition     string   `yaml:"ip_header_position"`
+	Capacity             int      `yaml:"capacity"`
+	CloudWatchEnabled    bool     `yaml:"cloudwatch_enabled"`
+	CloudWatchMetricName string   `yaml:"cloudwatch_metric_name"`
+	SampleRequests       bool     `yaml:"sample_requests"`
 }
 
 var validActions = []string{"ban", "captcha", "count"}
@@ -85,6 +86,8 @@ func getConfigFromEnv(config *bouncerConfig) {
 				switch k2 {
 				case "WEB_ACL_NAME":
 					acl.WebACLName = value
+				case "WEB_ACL_NAMES":
+					acl.WebACLNames = strings.Split(value, ",")
 				case "RULE_GROUP_NAME":
 					acl.RuleGroupName = value
 				case "REGION":
@@ -269,6 +272,9 @@ func newConfig(configPath string) (bouncerConfig, error) {
 		return bouncerConfig{}, fmt.Errorf("waf_config is required")
 	}
 	for _, c := range config.WebACLConfig {
+		if c.WebACLName != "" && c.WebACLNames != nil {
+			return bouncerConfig{}, fmt.Errorf("waf_config must contain either web_acl_name or web_acl_names")
+		}
 		if c.FallbackAction == "" {
 			return bouncerConfig{}, fmt.Errorf("fallback_action is required")
 		}
