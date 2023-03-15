@@ -8,29 +8,20 @@ GOGET=$(GOCMD) get
 GOOS ?= linux
 GOARCH ?= amd64
 
-#Current versioning information from env
-BUILD_VERSION?="$(shell git describe --tags `git rev-list --tags --max-count=1`)"
-BUILD_GOVERSION="$(shell go version | cut -d " " -f3 | sed -r 's/[go]+//g')"
+# Current versioning information from env
+BUILD_VERSION?="$(shell git describe --tags)"
 BUILD_TIMESTAMP=$(shell date +%F"_"%T)
 BUILD_TAG="$(shell git rev-parse HEAD)"
+
 export LD_OPTS=-ldflags "-s -w -X github.com/crowdsecurity/cs-aws-waf-bouncer/version.Version=$(BUILD_VERSION) \
 -X github.com/crowdsecurity/cs-aws-waf-bouncer/version.BuildDate=$(BUILD_TIMESTAMP) \
--X github.com/crowdsecurity/cs-aws-waf-bouncer/version.Tag=$(BUILD_TAG) \
--X github.com/crowdsecurity/cs-aws-waf-bouncer/version.GoVersion=$(BUILD_GOVERSION)"
+-X github.com/crowdsecurity/cs-aws-waf-bouncer/version.Tag=$(BUILD_TAG)"
 PREFIX?="/"
-PID_DIR = $(PREFIX)"/var/run/"
 BINARY_NAME=crowdsec-aws-waf-bouncer
 
 RELDIR = "crowdsec-aws-waf-bouncer-${BUILD_VERSION}"
 
 all: clean build
-
-goversion:
-	CURRENT_GOVERSION="$(shell go version | cut -d " " -f3 | sed -r 's/[go]+//g')"
-	REQUIRE_GOVERSION="1.17"
-	RESPECT_VERSION="$(shell echo "$(CURRENT_GOVERSION),$(REQUIRE_GOVERSION)" | tr ',' '\n' | sort -V)"
-
-
 
 static: clean
 	$(GOBUILD) $(LD_OPTS) -o $(BINARY_NAME) -v -a -tags netgo -ldflags '-w -extldflags "-static"'
@@ -42,7 +33,6 @@ clean:
 	@rm -f $(BINARY_NAME)
 	@rm -rf ${RELDIR}
 	@rm -f crowdsec-aws-waf-bouncer-*.tgz || ""
-
 
 .PHONY: release
 release: build
@@ -74,3 +64,5 @@ release_static: static
 	@chmod +x $(RELDIR)/uninstall.sh
 	@chmod +x $(RELDIR)/upgrade.sh
 	@tar cvzf crowdsec-aws-waf-bouncer-$(GOOS)-$(GOARCH)-static.tgz $(RELDIR)
+
+include mk/goversion.mk

@@ -248,9 +248,15 @@ func newConfig(configPath string) (bouncerConfig, error) {
 	if config.APIKey == "" && config.CertPath == "" && config.KeyPath == "" {
 		return bouncerConfig{}, fmt.Errorf("api_key or certificates paths are required")
 	}
+
 	if config.APIUrl == "" {
 		return bouncerConfig{}, fmt.Errorf("api_url is required")
 	}
+	
+	if !strings.HasSuffix(config.APIUrl, "/") {
+		config.APIUrl = config.APIUrl + "/"
+	}
+
 	if config.UpdateFrequency == "" {
 		config.UpdateFrequency = "10s"
 	}
