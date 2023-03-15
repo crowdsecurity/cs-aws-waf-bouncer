@@ -26,6 +26,7 @@ type WAF struct {
 	ipsetManager     *IPSetManager
 	visibilityConfig *wafv2.VisibilityConfig
 	lock             sync.Mutex
+	acls             []string
 }
 
 type IpSet struct {
@@ -426,10 +427,6 @@ func (w *WAF) CleanupAcl(acl *wafv2.WebACL, token *string) error {
 		log.Debugf("RuleGroup %s not found, nothing to do", w.config.RuleGroupName)
 	}
 
-	if err != nil {
-		return errors.Wrapf(err, "Failed to list IPSets")
-	}
-
 	w.ipsetManager.DeleteSets()
 
 	return nil
@@ -443,11 +440,18 @@ func (w *WAF) Cleanup() error {
 	if err != nil {
 		return errors.Wrapf(err, "Failed to list WAF resources")
 	}
-	acl, token, err := w.GetWebACL(w.config.WebACLName, w.aclsInfo[w.config.WebACLName].Id)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to get WebACL")
+	for _, acl := range w.acls {
+		aclDetails, token, err := w.GetWebACL(acl, w.aclsInfo[acl].Id)
+		if err != nil {
+			log.Errorf("Failed to get ACL %s: %s", acl, err)
+			continue
+		}
+		err = w.CleanupAcl(aclDetails, token)
+		if err != nil {
+			log.Errorf("Failed to cleanup ACL %s: %s", *aclDetails.Name, err)
+		}
 	}
-	return w.CleanupAcl(acl, token)
+	return nil
 }
 
 func (w *WAF) ListRessources() (map[string]Acl, map[string]IpSet, map[string]RuleGroup, error) {
@@ -484,23 +488,30 @@ func (w *WAF) Init() error {
 	w.logger.Tracef("Found %d RuleGroups", len(w.ruleGroupsInfos))
 	w.logger.Tracef("RuleGroups: %+v", w.ruleGroupsInfos)
 
-	if _, ok := w.aclsInfo[w.config.WebACLName]; !ok {
-		return fmt.Errorf("WebACL %s does not exist in region %s", w.config.WebACLName, w.config.Region)
-	}
-
-	acl, token, err := w.GetWebACL(w.config.WebACLName, w.aclsInfo[w.config.WebACLName].Id)
-
-	if err != nil {
-		return errors.Wrap(err, "Failed to get WebACL")
-	}
-
 	w.ipsetManager = NewIPSetManager(w.config.IpsetPrefix, w.config.Scope, w.client, w.logger)
 
-	err = w.CleanupAcl(acl, token)
+	for _, acl := range w.acls {
+		w.logger.Tracef("Adding ACL %s", acl)
+		if _, ok := w.aclsInfo[acl]; !ok {
+			return fmt.Errorf("WebACL %s does not exist in region %s", acl, w.config.Region)
+		}
 
-	if err != nil {
-		return errors.Wrap(err, "Failed to cleanup")
+		aclDetails, token, err := w.GetWebACL(acl, w.aclsInfo[acl].Id)
+
+		if err != nil {
+			w.logger.Error(err)
+			return errors.Wrap(err, "Failed to get WebACL")
+		}
+
+		err = w.CleanupAcl(aclDetails, token)
+
+		if err != nil {
+			w.logger.Error(err)
+			return errors.Wrap(err, "Failed to cleanup")
+		}
 	}
+
+	w.logger.Info("Cleanup done")
 
 	w.aclsInfo, w.setsInfos, w.ruleGroupsInfos, err = w.ListRessources()
 
@@ -514,22 +525,20 @@ func (w *WAF) Init() error {
 		return errors.Wrapf(err, "Failed to create RuleGroup %s", w.config.RuleGroupName)
 	}
 
-	acl, lockTocken, err := w.GetWebACL(w.config.WebACLName, w.aclsInfo[w.config.WebACLName].Id)
+	for _, acl := range w.acls {
 
-	if err != nil {
-		return errors.Wrapf(err, "Failed to get WebACL %s", w.config.WebACLName)
+		aclDetails, lockTocken, err := w.GetWebACL(acl, w.aclsInfo[acl].Id)
+
+		if err != nil {
+			return errors.Wrapf(err, "Failed to get WebACL %s", acl)
+		}
+
+		err = w.AddRuleGroupToACL(aclDetails, lockTocken)
+
+		if err != nil {
+			return errors.Wrapf(err, "Failed to add RuleGroup %s to WebACL %s", w.config.RuleGroupName, w.config.WebACLName)
+		}
 	}
-
-	err = w.AddRuleGroupToACL(acl, lockTocken)
-
-	if err != nil {
-		return errors.Wrapf(err, "Failed to add RuleGroup %s to WebACL %s", w.config.RuleGroupName, w.config.WebACLName)
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to list ressources: %s", err)
-	}
-
 	return nil
 }
 
@@ -717,14 +726,22 @@ func (w *WAF) Dump() {
 
 func NewWaf(config AclConfig) (*WAF, error) {
 	var s *session.Session
+	var acls []string
 	if config.Scope == "CLOUDFRONT" {
 		config.Region = "us-east-1"
+	}
+
+	if config.WebACLName != "" {
+		acls = append(acls, config.WebACLName)
+	}
+
+	if config.WebACLNames != nil {
+		acls = append(acls, config.WebACLNames...)
 	}
 
 	logger := log.WithFields(log.Fields{
 		"region": config.Region,
 		"scope":  config.Scope,
-		"acl":    config.WebACLName,
 	})
 
 	w := &WAF{
@@ -733,6 +750,7 @@ func NewWaf(config AclConfig) (*WAF, error) {
 		ruleGroupsInfos: make(map[string]RuleGroup),
 		logger:          logger,
 		decisionsChan:   make(chan Decisions),
+		acls:            acls,
 	}
 
 	if config.AWSProfile == "" {
