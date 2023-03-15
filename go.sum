@@ -342,8 +342,8 @@ github.com/creack/pty v1.1.7/go.mod h1:lj5s0c3V2DBrqTV7llrYr5NG6My20zk30Fl46Y7Do
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/creack/pty v1.1.11/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/crowdsecurity/crowdsec v1.4.1/go.mod h1:du34G8w0vTwVucLoPoI5s1SiZoA7a8ZDAYlzV0ZInRM=
-github.com/crowdsecurity/crowdsec v1.4.5 h1:bqDdZyW6Gsit28xrjiW9AoBs7KBTMl0fcnIokkHACho=
-github.com/crowdsecurity/crowdsec v1.4.5/go.mod h1:ZtSlyjECIVm8gOfd1FToQmGGwKiFM2SSDEGYp1QGOLQ=
+github.com/crowdsecurity/crowdsec v1.4.6 h1:KA1wcOGxfkxmapMIVUqT8KFYeOzbTRoWRIHhMm28Y84=
+github.com/crowdsecurity/crowdsec v1.4.6/go.mod h1:ZtSlyjECIVm8gOfd1FToQmGGwKiFM2SSDEGYp1QGOLQ=
 github.com/crowdsecurity/go-cs-bouncer v0.0.2 h1:0JgUxvCnDFMD4d1M0SHHYZ2w/w/bXxAostwbPU9Jqys=
 github.com/crowdsecurity/go-cs-bouncer v0.0.2/go.mod h1:4/mE5VPAmmh5jDslps/8Va/VOuXf1yzG2hssoXDpC9s=
 github.com/crowdsecurity/grokky v0.0.0-20220120093523-d5b3478363fa/go.mod h1:fx5UYUYAFIrOUNAkFCUOM2wJcsp9EWSQE9R0/9kaFJg=
