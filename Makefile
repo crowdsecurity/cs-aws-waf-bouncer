@@ -29,6 +29,10 @@ static: clean
 build: goversion clean
 	$(GOBUILD) $(LD_OPTS) -o $(BINARY_NAME) -v
 
+.PHONY: test
+test:
+	@$(GOTEST) ./...
+
 clean:
 	@rm -f $(BINARY_NAME)
 	@rm -rf ${RELDIR}
@@ -64,5 +68,10 @@ release_static: static
 	@chmod +x $(RELDIR)/uninstall.sh
 	@chmod +x $(RELDIR)/upgrade.sh
 	@tar cvzf crowdsec-aws-waf-bouncer-$(GOOS)-$(GOARCH)-static.tgz $(RELDIR)
+
+.PHONY: func-tests
+func-tests: build
+	pipenv install --dev
+	pipenv run pytest -v
 
 include mk/goversion.mk
