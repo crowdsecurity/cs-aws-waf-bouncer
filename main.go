@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/coreos/go-systemd/daemon"
+	"github.com/coreos/go-systemd/v22/daemon"
 	"github.com/crowdsecurity/crowdsec/pkg/models"
 	"github.com/crowdsecurity/cs-aws-waf-bouncer/version"
 	csbouncer "github.com/crowdsecurity/go-cs-bouncer"
