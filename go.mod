@@ -6,10 +6,11 @@ require (
 	github.com/aws/aws-sdk-go v1.44.187
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/crowdsecurity/crowdsec v1.4.6
-	github.com/crowdsecurity/go-cs-bouncer v0.0.2
+	github.com/crowdsecurity/go-cs-bouncer v0.0.3
 	github.com/google/uuid v1.3.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.0
+	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637
 	gopkg.in/yaml.v2 v2.4.0
@@ -43,9 +44,9 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
-	go.mongodb.org/mongo-driver v1.11.1 // indirect
-	golang.org/x/net v0.5.0 // indirect
-	golang.org/x/sys v0.4.0 // indirect
+	go.mongodb.org/mongo-driver v1.11.3 // indirect
+	golang.org/x/net v0.8.0 // indirect
+	golang.org/x/sys v0.6.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

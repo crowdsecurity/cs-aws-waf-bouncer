@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -14,7 +15,7 @@ import (
 	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/version"
 	csbouncer "github.com/crowdsecurity/go-cs-bouncer"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/tomb.v2"
+	"golang.org/x/sync/errgroup"
 )
 
 type Decisions struct {
@@ -27,7 +28,6 @@ type Decisions struct {
 }
 
 var wafInstances []*WAF = make([]*WAF, 0)
-var t *tomb.Tomb = &tomb.Tomb{}
 
 func cleanup() {
 	for _, waf := range wafInstances {
@@ -48,7 +48,6 @@ func signalHandler() {
 	go func() {
 		<-signalChan
 		log.Info("Received SIGTERM, exiting")
-		t.Kill(nil)
 		cleanup()
 	}()
 }
@@ -190,10 +189,12 @@ func main() {
 		wafInstances = append(wafInstances, w)
 	}
 
+	g, ctx := errgroup.WithContext(context.Background())
+
 	go signalHandler()
 
-	t.Go(func() error {
-		bouncer.Run()
+	g.Go(func() error {
+		bouncer.Run(ctx)
 		return fmt.Errorf("stream api init failed")
 	})
 
@@ -204,18 +205,15 @@ func main() {
 		}
 	}
 
-	t.Go(func() error {
+	g.Go(func() error {
 		log.Info("Starting processing decisions")
 		for {
 			select {
-			case <-t.Dying():
-				log.Info("tomb is dying")
+			case <-ctx.Done():
+				log.Info("terminating bouncer process")
 				for _, w := range wafInstances {
 					w.t.Kill(nil)
 				}
-				return nil
-			case <-t.Dead():
-				log.Info("tomb is dead")
 				return nil
 			case decisions := <-bouncer.Stream:
 				log.Info("Polling decisions")
@@ -228,8 +226,7 @@ func main() {
 		}
 	})
 
-	err = t.Wait()
-	if err != nil {
-		log.Error(err)
+	if err := g.Wait(); err != nil {
+		log.Fatalf("process return with error: %s", err)
 	}
 }
