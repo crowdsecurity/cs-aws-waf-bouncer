@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/coreos/go-systemd/v22/daemon"
 	"github.com/crowdsecurity/crowdsec/pkg/models"
-	"github.com/crowdsecurity/cs-aws-waf-bouncer/version"
+	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/version"
 	csbouncer "github.com/crowdsecurity/go-cs-bouncer"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/tomb.v2"
