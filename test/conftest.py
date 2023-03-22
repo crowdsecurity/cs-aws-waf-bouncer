@@ -5,8 +5,6 @@ Full integration test with a real Crowdsec running in Docker
 import contextlib
 import os
 import pathlib
-import secrets
-import string
 
 import pytest
 
