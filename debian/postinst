@@ -1,38 +1,65 @@
+#!/bin/sh
 
 systemctl daemon-reload
 
+BOUNCER="crowdsec-aws-waf-bouncer"
+BOUNCER_PREFIX="AWS-WAF"
+SERVICE="$BOUNCER.service"
+CONFIG="/etc/crowdsec/bouncers/$BOUNCER.yaml"
 
-START=0
+START=1
 
-if [ "$1" = "configure" ] && [ "$2" = "" ]; then
+do_configure() {
+    before=$(cat "$CONFIG")
+    # shellcheck disable=SC2016
+    after=$(envsubst '$API_KEY' < "$CONFIG")
 
-    type cscli
-
-    if [ "$?" -eq "0" ] ; then
-        START=1
-        echo "cscli/crowdsec is present, generating API key"
-        unique=`date +%s`
-        API_KEY=`cscli -oraw bouncers add AWS-WAF-${unique}`
-        if [ $? -eq 1 ] ; then
-            echo "failed to create API token, service won't be started."
-            START=0
-            API_KEY="<API_KEY>"
-        else
-            echo "API Key : ${API_KEY}"
-        fi
-
-        TMP=`mktemp -p /tmp/`
-        cp /etc/crowdsec/bouncers/crowdsec-aws-waf-bouncer.yaml ${TMP}
-        API_KEY=${API_KEY} envsubst < ${TMP} > /etc/crowdsec/bouncers/crowdsec-aws-waf-bouncer.yaml
-        rm ${TMP}
+    # is the configuration already done?
+    if [ "$before" = "$after" ]; then
+        return
     fi
+
+    # if we can't set the key, the user will take care of it
+    API_KEY="<API_KEY>"
+
+    if command -v cscli >/dev/null; then
+        echo "cscli/crowdsec is present, generating API key" >&2
+        unique=$(date +%s)
+        bouncer_id="$BOUNCER_PREFIX-$unique"
+        API_KEY=$(cscli -oraw bouncers add "$bouncer_id")
+        if [ $? -eq 1 ]; then
+            echo "failed to create API token" >&2
+            START=0
+        else
+            echo "API Key: ${API_KEY}" >&2
+            echo "$bouncer_id" > "$CONFIG.id"
+        fi
+    else
+        START=0
+    fi
+
+    # shellcheck disable=SC2016
+    echo "$before" | API_KEY="$API_KEY" envsubst '$API_KEY' | install -m 0600 /dev/stdin "$CONFIG"
+}
+
+if [ "$1" = "configure" ]; then
+    do_configure
+fi
+
+if command -v cscli >/dev/null; then
+    PORT=$(cscli config show --key "Config.API.Server.ListenURI" | cut -d ":" -f2)
+    if [ "$PORT" != "" ]; then
+       sed -i "s/localhost:8080/127.0.0.1:${PORT}/g" "$CONFIG"
+       sed -i "s/127.0.0.1:8080/127.0.0.1:${PORT}/g" "$CONFIG"
+    fi
+fi
+
+systemctl --quiet is-enabled "$SERVICE" || systemctl unmask "$SERVICE" && systemctl enable "$SERVICE"
+
+if [ "$START" -eq 0 ]; then
+    echo "no api key was generated, you can generate one on your LAPI Server by running 'cscli bouncers add <bouncer_name>' and add it to '$CONFIG'" >&2
 else
-    START=1
+    systemctl start "$SERVICE"
 fi
 
-
-if [ ${START} -eq 0 ] ; then
-    echo "no api key was generated, you can generate one on your LAPI Server by running 'cscli bouncers add <bouncer_name>' and add it to '/etc/crowdsec/bouncers/crowdsec-aws-waf-bouncer.yaml'"
-fi
-
-echo "Please configure your AWS WAF ACL in '/etc/crowdsec/bouncers/crowdsec-aws-waf-bouncer.yaml' and start the bouncer via 'sudo systemctl start crowdsec-aws-waf-bouncer' "
+echo "Please configure your AWS WAF ACL in '$CONFIG' and start the bouncer via 'sudo systemctl start $SERVICE'"
