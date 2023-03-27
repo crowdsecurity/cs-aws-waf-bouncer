@@ -1,53 +1,124 @@
-
 #!/bin/sh
-BIN_PATH_INSTALLED="/usr/local/bin/crowdsec-aws-waf-bouncer"
-BIN_PATH="./crowdsec-aws-waf-bouncer"
-CONFIG_DIR="/etc/crowdsec/bouncers/"
-SYSTEMD_PATH_FILE="/etc/systemd/system/crowdsec-aws-waf-bouncer.service"
 
-LAPI_KEY=""
+set -e
+
+set_colors() {
+    if [ ! -t 0 ]; then
+        # terminal is not interactive; no colors
+        FG_RED=""
+        FG_GREEN=""
+        FG_YELLOW=""
+        FG_CYAN=""
+        RESET=""
+    elif tput sgr0 >/dev/null; then
+        # terminfo
+        FG_RED=$(tput setaf 1)
+        FG_GREEN=$(tput setaf 2)
+        FG_YELLOW=$(tput setaf 3)
+        FG_CYAN=$(tput setaf 6)
+        RESET=$(tput sgr0)
+    else
+        FG_RED=$(printf '%b' '\033[31m')
+        FG_GREEN=$(printf '%b' '\033[32m')
+        FG_YELLOW=$(printf '%b' '\033[33m')
+        FG_CYAN=$(printf '%b' '\033[36m')
+        RESET=$(printf '%b' '\033[0m')
+    fi
+}
+
+set_colors
+
+msg() {
+    case "$1" in
+        info) echo "${FG_CYAN}$2${RESET}" >&2 ;;
+        warn) echo "${FG_YELLOW}$2${RESET}" >&2 ;;
+        err) echo "${FG_RED}$2${RESET}" >&2 ;;
+        succ) echo "${FG_GREEN}$2${RESET}" >&2 ;;
+        *) echo "$1" >&2 ;;
+    esac
+}
+
+#shellcheck disable=SC2312
+if [ "$(id -u)" -ne 0 ]; then
+    msg warn "Please run $0 as root or with sudo"
+    exit 1
+fi
+
+# --------------------------------- #
+
+BOUNCER="crowdsec-aws-waf-bouncer"
+SERVICE="$BOUNCER.service"
+BIN_PATH_INSTALLED="/usr/local/bin/$BOUNCER"
+BIN_PATH="./$BOUNCER"
+CONFIG_DIR="/etc/crowdsec/bouncers"
+CONFIG_FILE="$BOUNCER.yaml"
+CONFIG="$CONFIG_DIR/$CONFIG_FILE"
+SYSTEMD_PATH_FILE="/etc/systemd/system/$SERVICE"
+
+API_KEY="<API_KEY>"
+
 
 gen_apikey() {
-    which cscli > /dev/null
-    if [ $? -eq 0 ]; then 
-        echo "cscli found, generating bouncer api key."
-        SUFFIX=`tr -dc A-Za-z0-9 </dev/urandom | head -c 8`
-        LAPI_KEY=`cscli bouncers add crowdsec-aws-waf-bouncer-${SUFFIX} -o raw`
+    if command -v cscli >/dev/null; then
+        msg succ "cscli found, generating bouncer api key."
+        unique=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 8)
+        bouncer_id="cs-aws-waf-bouncer-$unique"
+        API_KEY=$(cscli -oraw bouncers add "$bouncer_id")
+        echo "$bouncer_id" > "$CONFIG.id"
+        msg info "API Key: $API_KEY"
         READY="yes"
-    else 
-        echo "cscli not found, you will need to generate api key."
+    else
+        msg warn "cscli not found, you will need to generate an api key."
         READY="no"
     fi
 }
 
 gen_config_file() {
-    LAPI_KEY=${LAPI_KEY} envsubst < ./config/crowdsec-aws-waf-bouncer.yaml > "${CONFIG_DIR}crowdsec-aws-waf-bouncer.yaml"
+    (umask 077; API_KEY=${API_KEY} envsubst <"./config/$CONFIG_FILE" >"$CONFIG")
 }
 
-
-install_aws_waf_bouncer() {
-	install -v -m 755 -D "${BIN_PATH}" "${BIN_PATH_INSTALLED}"
-	mkdir -p "${CONFIG_DIR}"
-	cp "./config/crowdsec-aws-waf-bouncer.yaml" "${CONFIG_DIR}crowdsec-aws-waf-bouncer.yaml"
-	CFG=${CONFIG_DIR} BIN=${BIN_PATH_INSTALLED} envsubst < ./config/crowdsec-aws-waf-bouncer.service > "${SYSTEMD_PATH_FILE}"
-	systemctl daemon-reload
+set_local_port() {
+    if command -v cscli >/dev/null; then
+        PORT=$(cscli config show --key "Config.API.Server.ListenURI" | cut -d ":" -f2)
+        if [ "$PORT" != "" ]; then
+           sed -i "s/localhost:8080/127.0.0.1:${PORT}/g" "$CONFIG"
+           sed -i "s/127.0.0.1:8080/127.0.0.1:${PORT}/g" "$CONFIG"
+        fi
+    fi
 }
 
-install_bouncer(){
-    echo "Installing crowdsec-aws-waf-bouncer"
-    install_aws_waf_bouncer
+install_bouncer() {
+    if [ ! -f "$BIN_PATH" ]; then
+        msg err "$BIN_PATH not found, exiting."
+        exit 1
+    fi
+    if [ -e "$BIN_PATH_INSTALLED" ]; then
+        msg warn "$BIN_PATH_INSTALLED is already installed. Exiting"
+        exit 1
+    fi
+    msg info "Installing $BOUNCER"
+    install -v -m 0755 -D "$BIN_PATH" "$BIN_PATH_INSTALLED"
+    mkdir -p "$CONFIG_DIR"
+    install -m 0600 "./config/$CONFIG_FILE" "$CONFIG"
+    CFG=${CONFIG_DIR} BIN=${BIN_PATH_INSTALLED} envsubst <"./config/$SERVICE" >"$SYSTEMD_PATH_FILE"
+    systemctl daemon-reload
     gen_apikey
-
     gen_config_file
-    systemctl enable crowdsec-aws-waf-bouncer.service
+    set_local_port
 }
 
+# --------------------------------- #
 
-if ! [ $(id -u) = 0 ]; then
-    echo "Please run the install script as root or with sudo"
-    exit 1
+set_colors
+install_bouncer
+
+systemctl enable "$SERVICE"
+if [ "$READY" = "yes" ]; then
+    systemctl start "$SERVICE"
+else
+    msg warn "service not started. You need to get an API key and configure it in $CONFIG"
 fi
 
-install_bouncer
-echo "Please configure '${CONFIG_DIR}crowdsec-aws-waf-bouncer.yaml'."
-echo "After configuration run the command 'systemctl start crowdsec-aws-waf-bouncer.service' to start the bouncer"
+msg info "Please configure '$CONFIG'."
+msg info "After configuration run the command 'systemctl start $SERVICE' to start the bouncer"
+exit 0
