@@ -118,7 +118,7 @@ func processDecisions(decisions *models.DecisionsStreamResponse, supportedAction
 }
 
 func main() {
-	configPath := flag.String("c", "", "path to crowdsec-firewall-bouncer.yaml")
+	configPath := flag.String("c", "", "path to crowdsec-aws-waf-bouncer.yaml")
 	bouncerVersion := flag.Bool("version", false, "display version and exit")
 	traceMode := flag.Bool("trace", false, "set trace mode")
 	debugMode := flag.Bool("debug", false, "set debug mode")

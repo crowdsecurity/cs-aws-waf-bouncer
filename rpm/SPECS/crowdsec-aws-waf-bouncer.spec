@@ -29,7 +29,7 @@ Requires: gettext
 
 %build
 BUILD_VERSION=%{local_version} make
-TMP=`mktemp -p /tmp/`
+TMP=$(mktemp -p /tmp/)
 cp config/%{name}.service ${TMP}
 BIN=%{_bindir}/%{name} CFG=/etc/crowdsec/ envsubst < ${TMP} > config/%{name}.service
 rm ${TMP}
