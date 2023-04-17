@@ -1,15 +1,14 @@
-Name:           crowdsec-aws-waf-bouncer
-Version:        %(echo $VERSION)
-Release:        %(echo $PACKAGE_NUMBER)%{?dist}
-Summary:      AWS WAF bouncer for Crowdsec 
+Name:      crowdsec-aws-waf-bouncer
+Version:   %(echo $VERSION)
+Release:   %(echo $PACKAGE_NUMBER)%{?dist}
+Summary:   AWS WAF bouncer for Crowdsec 
 
-License:        MIT
-URL:            https://crowdsec.net
-Source0:        https://github.com/crowdsecurity/%{name}/archive/v%(echo $VERSION).tar.gz
-BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+License:   MIT
+URL:       https://crowdsec.net
+Source0:   https://github.com/crowdsecurity/%{name}/archive/v%(echo $VERSION).tar.gz
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
-BuildRequires:  git
-BuildRequires:  make
+BuildRequires: make
 %{?fc33:BuildRequires: systemd-rpm-macros}
 
 Requires: gettext
@@ -18,91 +17,82 @@ Requires: gettext
 
 %description
 
-%define version_number  %(echo $VERSION)
-%define releasever  %(echo $RELEASEVER)
+%define version_number %(echo $VERSION)
+%define releasever %(echo $RELEASEVER)
 %global local_version v%{version_number}-%{releasever}-rpm
 %global name crowdsec-aws-waf-bouncer
 %global __mangle_shebangs_exclude_from /usr/bin/env
 
 %prep
-%setup -n crowdsec-aws-waf-bouncer-%{version}
+%setup -n %{name}-%{version}
 
 %build
 BUILD_VERSION=%{local_version} make
-TMP=$(mktemp -p /tmp/)
-cp config/%{name}.service ${TMP}
-BIN=%{_bindir}/%{name} CFG=/etc/crowdsec/ envsubst < ${TMP} > config/%{name}.service
-rm ${TMP}
 
 %install
 rm -rf %{buildroot}
-mkdir -p %{buildroot}/usr/bin
-install -m 755 -D %{name}  %{buildroot}%{_bindir}/%{name}
-install -m 600 -D config/%{name}.yaml %{buildroot}/etc/crowdsec/bouncers/%{name}.yaml 
-install -m 644 -D config/%{name}.service %{buildroot}%{_unitdir}/%{name}.service
+mkdir -p %{buildroot}%{_bindir}
+install -m 755 -D %{name} %{buildroot}%{_bindir}/%{name}
+install -m 600 -D config/%{name}.yaml %{buildroot}/etc/crowdsec/bouncers/%{name}.yaml
+install -m 600 -D scripts/_bouncer.sh %{buildroot}/usr/lib/%{name}/_bouncer.sh
+BIN=%{_bindir}/%{name} CFG=/etc/crowdsec/bouncers envsubst '$BIN $CFG' < config/%{name}.service | install -m 0644 -D /dev/stdin %{buildroot}%{_unitdir}/%{name}.service
 
 %clean
 rm -rf %{buildroot}
 
 %files
 %defattr(-,root,root,-)
-/usr/bin/%{name}
+${_bindir}/%{name}
+/usr/lib/%{name}/_bouncer.sh
 %{_unitdir}/%{name}.service
-%config(noreplace) /etc/crowdsec/bouncers/%{name}.yaml 
+%config(noreplace) /etc/crowdsec/bouncers/%{name}.yaml
 
-
-%post -p /bin/bash
+%post -p /usr/bin/sh
 systemctl daemon-reload
 
+BOUNCER="%{name}"
+BOUNCER_PREFIX="AWS_WAF"
 
-START=0
+. /usr/lib/%{name}/_bouncer.sh
+START=1
 
-systemctl is-active --quiet crowdsec
-
-if [ "$?" -eq "0" ] ; then
-    START=1
-    echo "cscli/crowdsec is present, generating API key"
-    unique=`date +%s`
-    API_KEY=`sudo cscli -oraw bouncers add AWS-WAF-${unique}`
-    if [ $? -eq 1 ] ; then
-        echo "failed to create API token, service won't be started."
-        START=0
-        API_KEY="<API_KEY>"
-    else
-        echo "API Key : ${API_KEY}"
+if [ "$1" = "1" ]; then
+    if need_api_key; then
+        if ! set_api_key; then
+            START=0
+        fi
     fi
 fi
 
-TMP=`mktemp -p /tmp/`
-cp /etc/crowdsec/bouncers/crowdsec-aws-waf-bouncer.yaml ${TMP}
-API_KEY=${API_KEY} envsubst < ${TMP} > /etc/crowdsec/bouncers/crowdsec-aws-waf-bouncer.yaml
-rm ${TMP}
+%systemd_post %{name}.service
 
-if [ ${START} -eq 0 ] ; then
-    echo "no api key was generated, you can generate one on your LAPI Server by running 'cscli bouncers add <bouncer_name>' and add it to '/etc/crowdsec/bouncers/crowdsec-aws-waf-bouncer.yaml'"
+if [ "$START" -eq 0 ]; then
+    echo "no api key was generated, you can generate one on your LAPI Server by running 'cscli bouncers add <bouncer_name>' and add it to '/etc/crowdsec/bouncers/$BOUNCER.yaml'" >&2
+else
+    %if 0%{?fc35}
+    systemctl enable "$SERVICE"
+    %endif
+    systemctl start "$SERVICE"
 fi
 
 echo "Please configure your AWS WAF ACL in '/etc/crowdsec/bouncers/crowdsec-aws-waf-bouncer.yaml' and start the bouncer via 'sudo systemctl start crowdsec-aws-waf-bouncer'" 
 
- 
 %changelog
 * Fri Mar 11 2022 Sebastien Blot <sebastien@crowdsec.net>
 - First initial packaging
 
-%preun -p /bin/bash
+%preun -p /usr/bin/sh
+BOUNCER="%{name}"
+. /usr/lib/%{name}/_bouncer.sh
 
-if [ "$1" == "0" ] ; then
-    systemctl stop crowdsec-aws-waf-bouncer || echo "cannot stop service"
-    systemctl disable crowdsec-aws-waf-bouncer || echo "cannot disable service"
+if [ "$1" = "0" ]; then
+    systemctl stop "$SERVICE" || echo "cannot stop service"
+    systemctl disable "$SERVICE" || echo "cannot disable service"
+    delete_bouncer
 fi
 
-
-
-%postun -p /bin/bash
+%postun -p /usr/bin/sh
 
 if [ "$1" == "1" ] ; then
-    systemctl restart  crowdsec-aws-waf-bouncer || echo "cannot restart service"
-elif [ "$1" == "0" ] ; then
-    systemctl stop crowdsec-aws-waf-bouncer
-    systemctl disable crowdsec-aws-waf-bouncer
+    systemctl restart %{name} || echo "cannot restart service"
 fi

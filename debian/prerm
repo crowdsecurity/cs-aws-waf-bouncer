@@ -1,2 +1,8 @@
-systemctl stop crowdsec-aws-waf-bouncer || echo "cannot stop service"
-systemctl disable crowdsec-aws-waf-bouncer || echo "cannot disable service"
+#!/bin/sh
+
+set -eu
+
+BOUNCER="crowdsec-aws-waf-bouncer"
+
+systemctl stop "$BOUNCER" || echo "cannot stop service"
+systemctl disable "$BOUNCER" || echo "cannot disable service"
