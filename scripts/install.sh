@@ -62,7 +62,7 @@ gen_apikey() {
     if command -v cscli >/dev/null; then
         msg succ "cscli found, generating bouncer api key."
         unique=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 8)
-        bouncer_id="cs-aws-waf-bouncer-$unique"
+        bouncer_id="$BOUNCER_PREFIX-$unique"
         API_KEY=$(cscli -oraw bouncers add "$bouncer_id")
         echo "$bouncer_id" > "$CONFIG.id"
         msg info "API Key: $API_KEY"
@@ -74,17 +74,9 @@ gen_apikey() {
 }
 
 gen_config_file() {
-    (umask 077; API_KEY=${API_KEY} envsubst <"./config/$CONFIG_FILE" >"$CONFIG")
-}
-
-set_local_port() {
-    if command -v cscli >/dev/null; then
-        PORT=$(cscli config show --key "Config.API.Server.ListenURI" | cut -d ":" -f2)
-        if [ "$PORT" != "" ]; then
-           sed -i "s/localhost:8080/127.0.0.1:${PORT}/g" "$CONFIG"
-           sed -i "s/127.0.0.1:8080/127.0.0.1:${PORT}/g" "$CONFIG"
-        fi
-    fi
+    # shellcheck disable=SC2016
+    API_KEY=${API_KEY} envsubst '$API_KEY' <"./config/$CONFIG_FILE" | \
+        install -D -m 0600 /dev/stdin "$CONFIG"
 }
 
 install_bouncer() {
@@ -98,9 +90,9 @@ install_bouncer() {
     fi
     msg info "Installing $BOUNCER"
     install -v -m 0755 -D "$BIN_PATH" "$BIN_PATH_INSTALLED"
-    mkdir -p "$CONFIG_DIR"
-    install -m 0600 "./config/$CONFIG_FILE" "$CONFIG"
-    CFG=${CONFIG_DIR} BIN=${BIN_PATH_INSTALLED} envsubst <"./config/$SERVICE" >"$SYSTEMD_PATH_FILE"
+    install -D -m 0600 "./config/$CONFIG_FILE" "$CONFIG"
+    # shellcheck disable=SC2016
+    CFG=${CONFIG_DIR} BIN=${BIN_PATH_INSTALLED} envsubst '$CFG $BIN' <"./config/$SERVICE" >"$SYSTEMD_PATH_FILE"
     systemctl daemon-reload
     gen_apikey
     gen_config_file
