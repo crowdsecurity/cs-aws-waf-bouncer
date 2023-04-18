@@ -1,10 +1,12 @@
 package waf
 
 import (
+	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/wafv2"
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
+
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
 )
@@ -159,7 +161,7 @@ func (w *WAFIpSet) Commit() error {
 	if currSet == nil {
 		summary, err := w.createIpSet()
 		if err != nil {
-			return errors.Wrapf(err, "Failed to create IPSet %s", w.name)
+			return fmt.Errorf("Failed to create IPSet %s: %w", w.name, err)
 		}
 		w.arn = *summary.ARN
 		w.id = *summary.Id
