@@ -42,7 +42,7 @@ rm -rf %{buildroot}
 
 %files
 %defattr(-,root,root,-)
-${_bindir}/%{name}
+%{_bindir}/%{name}
 /usr/lib/%{name}/_bouncer.sh
 %{_unitdir}/%{name}.service
 %config(noreplace) /etc/crowdsec/bouncers/%{name}.yaml
@@ -75,7 +75,7 @@ else
     systemctl start "$SERVICE"
 fi
 
-echo "Please configure your AWS WAF ACL in '/etc/crowdsec/bouncers/crowdsec-aws-waf-bouncer.yaml' and start the bouncer via 'sudo systemctl start crowdsec-aws-waf-bouncer'" 
+echo "Please configure your AWS WAF ACL in '$CONFIG' and start the bouncer via 'sudo systemctl start $SERVICE'" 
 
 %changelog
 * Fri Mar 11 2022 Sebastien Blot <sebastien@crowdsec.net>
