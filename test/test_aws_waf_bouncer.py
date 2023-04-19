@@ -53,7 +53,7 @@ def test_partial_config(bouncer, aw_cfg_factory):
         assert not aw.proc.is_running()
 
     waf = {
-        "web_acl_name": "testwebacl"
+        'web_acl_name': 'testwebacl'
     }
 
     cfg['waf_config'] = [waf]
@@ -74,7 +74,7 @@ def test_partial_config(bouncer, aw_cfg_factory):
         aw.proc.wait(timeout=0.2)
         assert not aw.proc.is_running()
 
-    waf["rule_group_name"] = "crowdsec-rule-group-eu-west-1"
+    waf['rule_group_name'] = 'crowdsec-rule-group-eu-west-1'
 
     with bouncer(cfg) as aw:
         aw.wait_for_lines_fnmatch([
@@ -83,7 +83,7 @@ def test_partial_config(bouncer, aw_cfg_factory):
         aw.proc.wait(timeout=0.2)
         assert not aw.proc.is_running()
 
-    waf['scope'] = "REGIONAL"
+    waf['scope'] = 'REGIONAL'
 
     with bouncer(cfg) as aw:
         aw.wait_for_lines_fnmatch([
@@ -92,7 +92,7 @@ def test_partial_config(bouncer, aw_cfg_factory):
         aw.proc.wait(timeout=0.2)
         assert not aw.proc.is_running()
 
-    waf['ipset_prefix'] = "crowdsec-ipset-a"
+    waf['ipset_prefix'] = 'crowdsec-ipset-a'
 
     with bouncer(cfg) as aw:
         aw.wait_for_lines_fnmatch([
@@ -101,7 +101,7 @@ def test_partial_config(bouncer, aw_cfg_factory):
         aw.proc.wait(timeout=0.2)
         assert not aw.proc.is_running()
 
-    waf['region'] = "eu-west-1"
+    waf['region'] = 'eu-west-1'
 
     with bouncer(cfg) as aw:
         aw.wait_for_lines_fnmatch([
