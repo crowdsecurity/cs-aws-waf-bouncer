@@ -19,7 +19,7 @@ def test_install_no_crowdsec(project_repo, bouncer_binary, must_be_root):
     c.expect(f"Installing {BOUNCER}")
     c.expect("WARN.* cscli not found, you will need to generate an api key.")
     c.expect(f"WARN.* service not started. You need to get an API key and configure it in {CONFIG}")
-    c.expect(f"Please configure {CONFIG} and start the service with 'systemctl start {BOUNCER}.service'")
+    c.expect(f"Please configure '{CONFIG}' and start the service with 'systemctl start {BOUNCER}.service'")
     c.wait()
     assert c.terminated
     assert c.exitstatus == 0
