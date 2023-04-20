@@ -65,6 +65,5 @@ else
     msg warn "service not started. You need to get an API key and configure it in $CONFIG"
 fi
 
-msg info "Please configure '$CONFIG'."
-msg info "After configuration run the command 'systemctl start $SERVICE' to start the bouncer"
+msg info "Please configure '$CONFIG' and start the service with 'systemctl start $SERVICE'"
 exit 0
