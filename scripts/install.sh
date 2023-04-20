@@ -2,9 +2,6 @@
 
 set -eu
 
-BOUNCER="crowdsec-aws-waf-bouncer"
-BOUNCER_PREFIX="cs-aws-waf-bouncer"
-
 . ./scripts/_bouncer.sh
 
 assert_root
