@@ -66,10 +66,10 @@ jobs:
         CROWDSEC_TEST_TIMEOUT: 60
         PYTEST_ADDOPTS: --durations=0 -vv --color=yes
       run: |
-        # unmarked
+        # everything except for rpm tests (skipped) and ./install (ignored)
         pipenv run pytest
         # these need root
-        sudo -E pipenv run pytest -m "scripts" ./test/test_scripts_no_crowdsec.py
+        sudo -E pipenv run pytest ./test/install/no_crowdsec
         # these need a running crowdsec
         docker run -d --name crowdsec -e CI_TESTING=true -e DISABLE_ONLINE_API -ti crowdsecurity/crowdsec
         install -m 0755 /dev/stdin /usr/local/bin/cscli <<'EOT'
@@ -77,7 +77,7 @@ jobs:
         docker exec crowdsec cscli "$@"
         EOT
         sleep 5
-        sudo -E pipenv run pytest -m "scripts" ./test/test_scripts_crowdsec.py
+        sudo -E pipenv run pytest ./test/install/with_crowdsec
 
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v3

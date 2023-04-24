@@ -6,8 +6,6 @@ import pytest
 from pytest_cs.lib import cscli, text
 
 
-pytestmark = pytest.mark.scripts
-
 BOUNCER = "crowdsec-aws-waf-bouncer"
 CONFIG = f"/etc/crowdsec/bouncers/{BOUNCER}.yaml"
 
