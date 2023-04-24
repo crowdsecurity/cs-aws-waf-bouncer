@@ -64,13 +64,12 @@ jobs:
         CROWDSEC_TEST_FLAVORS: full
         CROWDSEC_TEST_NETWORK: net-test
         CROWDSEC_TEST_TIMEOUT: 60
-        PYTEST_ADDOPTS: --durations=0 -vv --color=yes
+        PYTEST_ADDOPTS: --durations=0 -vv --color=yes -m "not (deb or rpm)"
       run: |
         # everything except for
         # - ./install (requires root, ignored by default)
-        # - rpm tests (can be run only on rpm distro)
-        # - deb build (has its own workflow)
-        pipenv run pytest --ignore=./test/pkg/test_build_deb.py
+        # - deb/rpm (on their own workflows)
+        pipenv run pytest
         # these need root
         sudo -E pipenv run pytest ./test/install/no_crowdsec
         # these need a running crowdsec
