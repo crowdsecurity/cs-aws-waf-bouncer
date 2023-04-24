@@ -69,7 +69,11 @@ jobs:
         # unmarked
         pipenv run pytest
         # these need root
-        sudo -E pipenv run pytest -m "scripts"
+        sudo -E pipenv run pytest -m "scripts" ./test/test_scripts_no_crowdsec.py
+        # these need a running crowdsec
+        docker run -d --name crowdsec -e CI_TESTING=true -e DISABLE_ONLINE_API -ti crowdsecurity/crowdsec
+        sleep 5
+        sudo -E pipenv run pytest -m "scripts" ./test/test_scripts_crowdsec.py
 
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v3
