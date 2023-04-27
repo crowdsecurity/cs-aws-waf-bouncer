@@ -1,9 +1,7 @@
-from .conftest import aw_binary
-
 
 def test_no_api_key(crowdsec, bouncer, aw_cfg_factory):
     cfg = aw_cfg_factory()
-    with bouncer(aw_binary, cfg) as aw:
+    with bouncer(cfg) as aw:
         aw.wait_for_lines_fnmatch([
             "*could not parse configuration: api_key or certificates paths are required*",
         ])
@@ -12,7 +10,7 @@ def test_no_api_key(crowdsec, bouncer, aw_cfg_factory):
 
     cfg['api_key'] = ''
 
-    with bouncer(aw_binary, cfg) as aw:
+    with bouncer(cfg) as aw:
         aw.wait_for_lines_fnmatch([
             "*could not parse configuration: api_key or certificates paths are required*",
         ])
@@ -25,7 +23,7 @@ def test_no_lapi_url(bouncer, aw_cfg_factory):
 
     cfg['api_key'] = 'not-used'
 
-    with bouncer(aw_binary, cfg) as aw:
+    with bouncer(cfg) as aw:
         aw.wait_for_lines_fnmatch([
             "*could not parse configuration: api_url is required*",
         ])
@@ -34,7 +32,7 @@ def test_no_lapi_url(bouncer, aw_cfg_factory):
 
     cfg['api_url'] = ''
 
-    with bouncer(aw_binary, cfg) as aw:
+    with bouncer(cfg) as aw:
         aw.wait_for_lines_fnmatch([
             "*could not parse configuration: api_url is required*",
         ])
@@ -47,7 +45,7 @@ def test_partial_config(bouncer, aw_cfg_factory):
     cfg['api_key'] = 'not-used'
     cfg['api_url'] = 'http://localhost:8237'
 
-    with bouncer(aw_binary, cfg) as aw:
+    with bouncer(cfg) as aw:
         aw.wait_for_lines_fnmatch([
             "*could not parse configuration: waf_config is required*",
         ])
@@ -55,12 +53,12 @@ def test_partial_config(bouncer, aw_cfg_factory):
         assert not aw.proc.is_running()
 
     waf = {
-        "web_acl_name": "testwebacl"
+        'web_acl_name': 'testwebacl'
     }
 
     cfg['waf_config'] = [waf]
 
-    with bouncer(aw_binary, cfg) as aw:
+    with bouncer(cfg) as aw:
         aw.wait_for_lines_fnmatch([
             "*could not parse configuration: fallback_action is required*",
         ])
@@ -69,43 +67,43 @@ def test_partial_config(bouncer, aw_cfg_factory):
 
     waf['fallback_action'] = 'ban'
 
-    with bouncer(aw_binary, cfg) as aw:
+    with bouncer(cfg) as aw:
         aw.wait_for_lines_fnmatch([
             "*could not parse configuration: rule_group_name is required*",
         ])
         aw.proc.wait(timeout=0.2)
         assert not aw.proc.is_running()
 
-    waf["rule_group_name"] = "crowdsec-rule-group-eu-west-1"
+    waf['rule_group_name'] = 'crowdsec-rule-group-eu-west-1'
 
-    with bouncer(aw_binary, cfg) as aw:
+    with bouncer(cfg) as aw:
         aw.wait_for_lines_fnmatch([
             "*could not parse configuration: scope is required*",
         ])
         aw.proc.wait(timeout=0.2)
         assert not aw.proc.is_running()
 
-    waf['scope'] = "REGIONAL"
+    waf['scope'] = 'REGIONAL'
 
-    with bouncer(aw_binary, cfg) as aw:
+    with bouncer(cfg) as aw:
         aw.wait_for_lines_fnmatch([
             "*could not parse configuration: ipset_prefix is required*",
         ])
         aw.proc.wait(timeout=0.2)
         assert not aw.proc.is_running()
 
-    waf['ipset_prefix'] = "crowdsec-ipset-a"
+    waf['ipset_prefix'] = 'crowdsec-ipset-a'
 
-    with bouncer(aw_binary, cfg) as aw:
+    with bouncer(cfg) as aw:
         aw.wait_for_lines_fnmatch([
             "*could not parse configuration: region is required when scope is REGIONAL*",
         ])
         aw.proc.wait(timeout=0.2)
         assert not aw.proc.is_running()
 
-    waf['region'] = "eu-west-1"
+    waf['region'] = 'eu-west-1'
 
-    with bouncer(aw_binary, cfg) as aw:
+    with bouncer(cfg) as aw:
         aw.wait_for_lines_fnmatch([
             "*could not initialize waf instance: failed to list ressources: NoCredentialProviders: no valid providers in chain*"
         ])

@@ -1,9 +1,7 @@
 #!/usr/bin/make -f
 
-export DEB_VERSION=$(shell dpkg-parsechangelog | egrep '^Version:' | cut -f 2 -d ' ')
+export DEB_VERSION=$(shell dpkg-parsechangelog | grep -E '^Version:' | cut -f 2 -d ' ')
 export BUILD_VERSION=v${DEB_VERSION}-debian-pragmatic
-export GO111MODULE=on
-
 
 %:
 	dh $@
@@ -14,10 +12,19 @@ override_dh_auto_clean:
 override_dh_auto_test:
 override_dh_auto_build:
 override_dh_auto_install:
-	make
-	mkdir -p debian/crowdsec-aws-waf-bouncer/usr/bin
-	cp crowdsec-aws-waf-bouncer  debian/crowdsec-aws-waf-bouncer/usr/bin
-	mkdir -p debian/crowdsec-aws-waf-bouncer/etc/systemd/system/
-	mkdir -p debian/crowdsec-aws-waf-bouncer/etc/crowdsec/bouncers/
-	BIN=/usr/bin/crowdsec-aws-waf-bouncer CFG=/etc/crowdsec/bouncers envsubst < config/crowdsec-aws-waf-bouncer.service >  debian/crowdsec-aws-waf-bouncer/etc/systemd/system/crowdsec-aws-waf-bouncer.service
-	cp config/crowdsec-aws-waf-bouncer.yaml debian/crowdsec-aws-waf-bouncer/etc/crowdsec/bouncers/
+	@make build
+
+	@BOUNCER=crowdsec-aws-waf-bouncer; \
+	PKG="$$BOUNCER"; \
+	install -D "$$BOUNCER" -t "debian/$$PKG/usr/bin/"; \
+	install -D "scripts/_bouncer.sh" -t "debian/$$PKG/usr/lib/$$PKG/"; \
+	install -D "config/$$BOUNCER.yaml" "debian/$$PKG/etc/crowdsec/bouncers/$$BOUNCER.yaml"; \
+	BIN="/usr/bin/$$BOUNCER" CFG="/etc/crowdsec/bouncers" envsubst '$$BIN $$CFG' < "config/$$BOUNCER.service" | install -D /dev/stdin "debian/$$PKG/etc/systemd/system/$$BOUNCER.service"
+
+execute_after_dh_fixperms:
+	@BOUNCER=crowdsec-aws-waf-bouncer; \
+	PKG="$$BOUNCER"; \
+	chmod 0755 "debian/$$PKG/usr/bin/$$BOUNCER"; \
+	chmod 0600 "debian/$$PKG/usr/lib/$$PKG/_bouncer.sh"; \
+	chmod 0600 "debian/$$PKG/etc/crowdsec/bouncers/$$BOUNCER.yaml"; \
+	chmod 0644 "debian/$$PKG/etc/systemd/system/$$BOUNCER.service"
