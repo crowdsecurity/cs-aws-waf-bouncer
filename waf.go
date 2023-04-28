@@ -12,10 +12,12 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/tomb.v2"
+
+	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/cfg"
 )
 
 type WAF struct {
-	config           *AclConfig
+	config           *cfg.AclConfig
 	client           *wafv2.WAFV2
 	setsInfos        map[string]IpSet
 	ruleGroupsInfos  map[string]RuleGroup
@@ -169,7 +171,7 @@ func (w *WAF) UpdateRuleGroup() error {
 		}
 	}
 
-	for _, actionType := range validActions {
+	for _, actionType := range cfg.ValidActions {
 		statement := w.getWafStatement(actionType)
 		if statement != nil {
 			r := &wafv2.Rule{
@@ -616,7 +618,7 @@ func (w *WAF) UpdateGeoSet(d Decisions) error {
 		}
 	}
 
-	for _, action := range validActions {
+	for _, action := range cfg.ValidActions {
 		decisions[action] = make([]*string, 0)
 		decisions[action] = append(decisions[action], d.countriesAdd[action]...)
 		if w.config.FallbackAction == action && len(d.countriesAdd["fallback"]) > 0 {
@@ -715,7 +717,7 @@ func (w *WAF) Dump() {
 	w.logger.Debugf("WAF sets: %+v", w.setsInfos)
 }
 
-func NewWaf(config AclConfig) (*WAF, error) {
+func NewWaf(config cfg.AclConfig) (*WAF, error) {
 	var s *session.Session
 	if config.Scope == "CLOUDFRONT" {
 		config.Region = "us-east-1"

@@ -1,4 +1,4 @@
-package main
+package cfg
 
 import (
 	"fmt"
@@ -7,10 +7,12 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/crowdsecurity/crowdsec/pkg/types"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 	"gopkg.in/natefinch/lumberjack.v2"
 	"gopkg.in/yaml.v2"
+
+	"github.com/crowdsecurity/crowdsec/pkg/types"
 )
 
 type bouncerConfig struct {
@@ -49,7 +51,7 @@ type AclConfig struct {
 	SampleRequests       bool   `yaml:"sample_requests"`
 }
 
-var validActions = []string{"ban", "captcha", "count"}
+var ValidActions = []string{"ban", "captcha", "count"}
 var validScopes = []string{"REGIONAL", "CLOUDFRONT"}
 var validIpHeaderPosition = []string{"FIRST", "LAST", "ANY"}
 
@@ -184,7 +186,7 @@ func getConfigFromEnv(config *bouncerConfig) {
 	}
 }
 
-func newConfig(configPath string) (bouncerConfig, error) {
+func NewConfig(configPath string) (bouncerConfig, error) {
 	var config bouncerConfig
 	ipsetPrefix := make(map[string]bool)
 	ruleGroupNames := make(map[string]bool)
@@ -252,7 +254,7 @@ func newConfig(configPath string) (bouncerConfig, error) {
 	if config.APIUrl == "" {
 		return bouncerConfig{}, fmt.Errorf("api_url is required")
 	}
-	
+
 	if !strings.HasSuffix(config.APIUrl, "/") {
 		config.APIUrl = config.APIUrl + "/"
 	}
@@ -262,13 +264,13 @@ func newConfig(configPath string) (bouncerConfig, error) {
 	}
 
 	for _, action := range config.SupportedActions {
-		if !contains(validActions, action) {
-			return bouncerConfig{}, fmt.Errorf("supported_actions must be a list from %v", validActions)
+		if !slices.Contains(ValidActions, action) {
+			return bouncerConfig{}, fmt.Errorf("supported_actions must be a list from %v", ValidActions)
 		}
 	}
 
 	if len(config.SupportedActions) == 0 {
-		config.SupportedActions = validActions
+		config.SupportedActions = ValidActions
 	}
 
 	if len(config.WebACLConfig) == 0 {
@@ -278,8 +280,8 @@ func newConfig(configPath string) (bouncerConfig, error) {
 		if c.FallbackAction == "" {
 			return bouncerConfig{}, fmt.Errorf("fallback_action is required")
 		}
-		if !contains(validActions, c.FallbackAction) {
-			return bouncerConfig{}, fmt.Errorf("fallback_action must be one of %v", validActions)
+		if !slices.Contains(ValidActions, c.FallbackAction) {
+			return bouncerConfig{}, fmt.Errorf("fallback_action must be one of %v", ValidActions)
 		}
 		if c.RuleGroupName == "" {
 			return bouncerConfig{}, fmt.Errorf("rule_group_name is required")
@@ -292,11 +294,11 @@ func newConfig(configPath string) (bouncerConfig, error) {
 			return bouncerConfig{}, fmt.Errorf("ip_header_position is required when ip_header is set")
 		}
 
-		if c.IPHeaderPosition != "" && !contains(validIpHeaderPosition, c.IPHeaderPosition) {
+		if c.IPHeaderPosition != "" && !slices.Contains(validIpHeaderPosition, c.IPHeaderPosition) {
 			return bouncerConfig{}, fmt.Errorf("ip_header_position must be one of %v", validIpHeaderPosition)
 		}
 
-		if !contains(validScopes, c.Scope) {
+		if !slices.Contains(validScopes, c.Scope) {
 			return bouncerConfig{}, fmt.Errorf("scope must be one of %v", validScopes)
 		}
 		if c.IpsetPrefix == "" {

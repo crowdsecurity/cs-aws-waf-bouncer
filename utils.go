@@ -22,15 +22,6 @@ func removesString(slice []string, s string) []string {
 	return slice
 }
 
-func contains(s []string, e string) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
-}
-
 func removeRuleFromRuleGroup(rules []*wafv2.Rule, name string) []*wafv2.Rule {
 	for i, r := range rules {
 		if *r.Name == name {

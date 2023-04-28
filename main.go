@@ -11,11 +11,15 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/coreos/go-systemd/v22/daemon"
-	"github.com/crowdsecurity/crowdsec/pkg/models"
-	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/version"
-	csbouncer "github.com/crowdsecurity/go-cs-bouncer"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/crowdsecurity/crowdsec/pkg/models"
+	csbouncer "github.com/crowdsecurity/go-cs-bouncer"
+
+	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/cfg"
+	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/version"
 )
 
 type Decisions struct {
@@ -64,7 +68,7 @@ func processDecisions(decisions *models.DecisionsStreamResponse, supportedAction
 
 	for _, decision := range decisions.New {
 		decisionType := strings.ToLower(*decision.Type)
-		if !contains(supportedActions, decisionType) {
+		if !slices.Contains(supportedActions, decisionType) {
 			decisionType = "fallback"
 		}
 		if strings.ToLower(*decision.Scope) == "ip" || strings.ToLower(*decision.Scope) == "range" {
@@ -90,7 +94,7 @@ func processDecisions(decisions *models.DecisionsStreamResponse, supportedAction
 
 	for _, decision := range decisions.Deleted {
 		decisionType := strings.ToLower(*decision.Type)
-		if !contains(supportedActions, decisionType) {
+		if !slices.Contains(supportedActions, decisionType) {
 			decisionType = "fallback"
 		}
 		if strings.ToLower(*decision.Scope) == "ip" || strings.ToLower(*decision.Scope) == "range" {
@@ -131,7 +135,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	config, err := newConfig(*configPath)
+	config, err := cfg.NewConfig(*configPath)
 
 	if debugMode != nil && *debugMode {
 		log.SetLevel(log.DebugLevel)

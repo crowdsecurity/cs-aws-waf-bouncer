@@ -10,6 +10,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.0
+	golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637
