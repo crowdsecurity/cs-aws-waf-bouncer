@@ -19,13 +19,6 @@ type bouncerConfig struct {
 	InsecureSkipVerify bool          `yaml:"insecure_skip_verify"`
 	Daemon             bool          `yaml:"daemon"`
 	Logging            LoggingConfig `yaml:",inline"`
-	LogLevel           log.Level     `yaml:"log_level"`
-	LogMedia           string        `yaml:"log_media"`
-	LogDir             string        `yaml:"log_dir"`
-	LogMaxSize         int           `yaml:"log_max_size"`
-	LogMaxAge          int           `yaml:"log_max_age"`
-	LogMaxFiles        int           `yaml:"log_max_backups"`
-	CompressLogs       *bool         `yaml:"compress_logs"`
 	WebACLConfig       []AclConfig   `yaml:"waf_config"`
 	KeyPath            string        `yaml:"key_path"`
 	CertPath           string        `yaml:"cert_path"`
@@ -138,34 +131,35 @@ func getConfigFromEnv(config *bouncerConfig) {
 					level, err := log.ParseLevel(value)
 					if err != nil {
 						log.Warnf("Invalid log level: %s, using INFO", value)
-						config.LogLevel = log.InfoLevel
+						defaultLevel := log.InfoLevel
+						config.Logging.LogLevel = &defaultLevel
 					} else {
-						config.LogLevel = level
+						config.Logging.LogLevel = &level
 					}
 				case "BOUNCER_LOG_MEDIA":
-					config.LogMedia = value
+					config.Logging.LogMedia = value
 				case "BOUNCER_LOG_DIR":
-					config.LogDir = value
+					config.Logging.LogDir = value
 				case "BOUNCER_LOG_MAX_SIZE":
-					config.LogMaxSize, err = strconv.Atoi(value)
+					config.Logging.LogMaxSize, err = strconv.Atoi(value)
 					if err != nil {
 						log.Warnf("Invalid log max size from env: %s, using 40", value)
-						config.LogMaxSize = 40
+						config.Logging.LogMaxSize = 40
 					}
 				case "BOUNCER_LOG_MAX_AGE":
-					config.LogMaxAge, err = strconv.Atoi(value)
+					config.Logging.LogMaxAge, err = strconv.Atoi(value)
 					if err != nil {
 						log.Warnf("Invalid log max age from env: %s, using 7", value)
-						config.LogMaxAge = 7
+						config.Logging.LogMaxAge = 7
 					}
 				case "BOUNCER_LOG_MAX_FILES":
-					config.LogMaxFiles, err = strconv.Atoi(value)
+					config.Logging.LogMaxFiles, err = strconv.Atoi(value)
 					if err != nil {
 						log.Warnf("Invalid log max files from env: %s, using 7", value)
-						config.LogMaxFiles = 7
+						config.Logging.LogMaxFiles = 7
 					}
 				case "BOUNCER_COMPRESS_LOGS":
-					config.CompressLogs = aws.Bool(value == "true")
+					config.Logging.CompressLogs = aws.Bool(value == "true")
 				case "BOUNCER_CERT_PATH":
 					config.CertPath = value
 				case "BOUNCER_KEY_PATH":
