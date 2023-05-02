@@ -9,30 +9,28 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
-	"gopkg.in/natefinch/lumberjack.v2"
 	"gopkg.in/yaml.v2"
-
-	"github.com/crowdsecurity/crowdsec/pkg/types"
 )
 
 type bouncerConfig struct {
-	APIKey             string      `yaml:"api_key"`
-	APIUrl             string      `yaml:"api_url"`
-	UpdateFrequency    string      `yaml:"update_frequency"`
-	InsecureSkipVerify bool        `yaml:"insecure_skip_verify"`
-	Daemon             bool        `yaml:"daemon"`
-	LogLevel           log.Level   `yaml:"log_level"`
-	LogMedia           string      `yaml:"log_media"`
-	LogDir             string      `yaml:"log_dir"`
-	LogMaxSize         int         `yaml:"log_max_size"`
-	LogMaxAge          int         `yaml:"log_max_age"`
-	LogMaxFiles        int         `yaml:"log_max_backups"`
-	CompressLogs       *bool       `yaml:"compress_logs"`
-	WebACLConfig       []AclConfig `yaml:"waf_config"`
-	KeyPath            string      `yaml:"key_path"`
-	CertPath           string      `yaml:"cert_path"`
-	CAPath             string      `yaml:"ca_cert_path"`
-	SupportedActions   []string    `yaml:"supported_actions"`
+	APIKey             string        `yaml:"api_key"`
+	APIUrl             string        `yaml:"api_url"`
+	UpdateFrequency    string        `yaml:"update_frequency"`
+	InsecureSkipVerify bool          `yaml:"insecure_skip_verify"`
+	Daemon             bool          `yaml:"daemon"`
+	Logging            LoggingConfig `yaml:",inline"`
+	LogLevel           log.Level     `yaml:"log_level"`
+	LogMedia           string        `yaml:"log_media"`
+	LogDir             string        `yaml:"log_dir"`
+	LogMaxSize         int           `yaml:"log_max_size"`
+	LogMaxAge          int           `yaml:"log_max_age"`
+	LogMaxFiles        int           `yaml:"log_max_backups"`
+	CompressLogs       *bool         `yaml:"compress_logs"`
+	WebACLConfig       []AclConfig   `yaml:"waf_config"`
+	KeyPath            string        `yaml:"key_path"`
+	CertPath           string        `yaml:"cert_path"`
+	CAPath             string        `yaml:"ca_cert_path"`
+	SupportedActions   []string      `yaml:"supported_actions"`
 }
 
 type AclConfig struct {
@@ -204,47 +202,8 @@ func NewConfig(configPath string) (bouncerConfig, error) {
 
 	getConfigFromEnv(&config)
 
-	if config.LogMedia == "" {
-		config.LogMedia = "stdout"
-	}
-
-	if config.LogLevel == 0 {
-		config.LogLevel = log.InfoLevel
-	}
-
-	if err := types.SetDefaultLoggerConfig(config.LogMedia, config.LogDir, config.LogLevel, config.LogMaxSize, config.LogMaxFiles, config.LogMaxAge, config.CompressLogs, false); err != nil {
-		log.Fatal(err.Error())
-	}
-
-	if config.LogMedia == "file" {
-		if config.LogDir == "" {
-			config.LogDir = "/var/log/"
-		}
-		_maxsize := 40
-		if config.LogMaxSize != 0 {
-			_maxsize = config.LogMaxSize
-		}
-		_maxfiles := 3
-		if config.LogMaxFiles != 0 {
-			_maxfiles = config.LogMaxFiles
-		}
-		_maxage := 30
-		if config.LogMaxAge != 0 {
-			_maxage = config.LogMaxAge
-		}
-		_compress := true
-		if config.CompressLogs != nil {
-			_compress = *config.CompressLogs
-		}
-		logOutput := &lumberjack.Logger{
-			Filename:   config.LogDir + "/crowdsec-aws-waf-bouncer.log",
-			MaxSize:    _maxsize,
-			MaxBackups: _maxfiles,
-			MaxAge:     _maxage,
-			Compress:   _compress,
-		}
-		log.SetOutput(logOutput)
-		log.SetFormatter(&log.TextFormatter{TimestampFormat: "02-01-2006 15:04:05", FullTimestamp: true})
+	if err := config.Logging.setup("crowdsec-aws-waf-bouncer.log"); err != nil {
+		return bouncerConfig{}, err
 	}
 
 	if config.APIKey == "" && config.CertPath == "" && config.KeyPath == "" {
