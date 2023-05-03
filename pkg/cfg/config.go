@@ -1,4 +1,4 @@
-package main
+package cfg
 
 import (
 	"fmt"
@@ -7,30 +7,23 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/crowdsecurity/crowdsec/pkg/types"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/natefinch/lumberjack.v2"
+	"golang.org/x/exp/slices"
 	"gopkg.in/yaml.v2"
 )
 
 type bouncerConfig struct {
-	APIKey             string      `yaml:"api_key"`
-	APIUrl             string      `yaml:"api_url"`
-	UpdateFrequency    string      `yaml:"update_frequency"`
-	InsecureSkipVerify bool        `yaml:"insecure_skip_verify"`
-	Daemon             bool        `yaml:"daemon"`
-	LogLevel           log.Level   `yaml:"log_level"`
-	LogMedia           string      `yaml:"log_media"`
-	LogDir             string      `yaml:"log_dir"`
-	LogMaxSize         int         `yaml:"log_max_size"`
-	LogMaxAge          int         `yaml:"log_max_age"`
-	LogMaxFiles        int         `yaml:"log_max_backups"`
-	CompressLogs       *bool       `yaml:"compress_logs"`
-	WebACLConfig       []AclConfig `yaml:"waf_config"`
-	KeyPath            string      `yaml:"key_path"`
-	CertPath           string      `yaml:"cert_path"`
-	CAPath             string      `yaml:"ca_cert_path"`
-	SupportedActions   []string    `yaml:"supported_actions"`
+	APIKey             string        `yaml:"api_key"`
+	APIUrl             string        `yaml:"api_url"`
+	UpdateFrequency    string        `yaml:"update_frequency"`
+	InsecureSkipVerify bool          `yaml:"insecure_skip_verify"`
+	Daemon             bool          `yaml:"daemon"`
+	Logging            LoggingConfig `yaml:",inline"`
+	WebACLConfig       []AclConfig   `yaml:"waf_config"`
+	KeyPath            string        `yaml:"key_path"`
+	CertPath           string        `yaml:"cert_path"`
+	CAPath             string        `yaml:"ca_cert_path"`
+	SupportedActions   []string      `yaml:"supported_actions"`
 }
 
 type AclConfig struct {
@@ -49,7 +42,7 @@ type AclConfig struct {
 	SampleRequests       bool   `yaml:"sample_requests"`
 }
 
-var validActions = []string{"ban", "captcha", "count"}
+var ValidActions = []string{"ban", "captcha", "count"}
 var validScopes = []string{"REGIONAL", "CLOUDFRONT"}
 var validIpHeaderPosition = []string{"FIRST", "LAST", "ANY"}
 
@@ -138,34 +131,35 @@ func getConfigFromEnv(config *bouncerConfig) {
 					level, err := log.ParseLevel(value)
 					if err != nil {
 						log.Warnf("Invalid log level: %s, using INFO", value)
-						config.LogLevel = log.InfoLevel
+						defaultLevel := log.InfoLevel
+						config.Logging.LogLevel = &defaultLevel
 					} else {
-						config.LogLevel = level
+						config.Logging.LogLevel = &level
 					}
 				case "BOUNCER_LOG_MEDIA":
-					config.LogMedia = value
+					config.Logging.LogMedia = value
 				case "BOUNCER_LOG_DIR":
-					config.LogDir = value
+					config.Logging.LogDir = value
 				case "BOUNCER_LOG_MAX_SIZE":
-					config.LogMaxSize, err = strconv.Atoi(value)
+					config.Logging.LogMaxSize, err = strconv.Atoi(value)
 					if err != nil {
 						log.Warnf("Invalid log max size from env: %s, using 40", value)
-						config.LogMaxSize = 40
+						config.Logging.LogMaxSize = 40
 					}
 				case "BOUNCER_LOG_MAX_AGE":
-					config.LogMaxAge, err = strconv.Atoi(value)
+					config.Logging.LogMaxAge, err = strconv.Atoi(value)
 					if err != nil {
 						log.Warnf("Invalid log max age from env: %s, using 7", value)
-						config.LogMaxAge = 7
+						config.Logging.LogMaxAge = 7
 					}
 				case "BOUNCER_LOG_MAX_FILES":
-					config.LogMaxFiles, err = strconv.Atoi(value)
+					config.Logging.LogMaxFiles, err = strconv.Atoi(value)
 					if err != nil {
 						log.Warnf("Invalid log max files from env: %s, using 7", value)
-						config.LogMaxFiles = 7
+						config.Logging.LogMaxFiles = 7
 					}
 				case "BOUNCER_COMPRESS_LOGS":
-					config.CompressLogs = aws.Bool(value == "true")
+					config.Logging.CompressLogs = aws.Bool(value == "true")
 				case "BOUNCER_CERT_PATH":
 					config.CertPath = value
 				case "BOUNCER_KEY_PATH":
@@ -184,7 +178,7 @@ func getConfigFromEnv(config *bouncerConfig) {
 	}
 }
 
-func newConfig(configPath string) (bouncerConfig, error) {
+func NewConfig(configPath string) (bouncerConfig, error) {
 	var config bouncerConfig
 	ipsetPrefix := make(map[string]bool)
 	ruleGroupNames := make(map[string]bool)
@@ -202,47 +196,8 @@ func newConfig(configPath string) (bouncerConfig, error) {
 
 	getConfigFromEnv(&config)
 
-	if config.LogMedia == "" {
-		config.LogMedia = "stdout"
-	}
-
-	if config.LogLevel == 0 {
-		config.LogLevel = log.InfoLevel
-	}
-
-	if err := types.SetDefaultLoggerConfig(config.LogMedia, config.LogDir, config.LogLevel, config.LogMaxSize, config.LogMaxFiles, config.LogMaxAge, config.CompressLogs, false); err != nil {
-		log.Fatal(err.Error())
-	}
-
-	if config.LogMedia == "file" {
-		if config.LogDir == "" {
-			config.LogDir = "/var/log/"
-		}
-		_maxsize := 40
-		if config.LogMaxSize != 0 {
-			_maxsize = config.LogMaxSize
-		}
-		_maxfiles := 3
-		if config.LogMaxFiles != 0 {
-			_maxfiles = config.LogMaxFiles
-		}
-		_maxage := 30
-		if config.LogMaxAge != 0 {
-			_maxage = config.LogMaxAge
-		}
-		_compress := true
-		if config.CompressLogs != nil {
-			_compress = *config.CompressLogs
-		}
-		logOutput := &lumberjack.Logger{
-			Filename:   config.LogDir + "/crowdsec-aws-waf-bouncer.log",
-			MaxSize:    _maxsize,
-			MaxBackups: _maxfiles,
-			MaxAge:     _maxage,
-			Compress:   _compress,
-		}
-		log.SetOutput(logOutput)
-		log.SetFormatter(&log.TextFormatter{TimestampFormat: "02-01-2006 15:04:05", FullTimestamp: true})
+	if err := config.Logging.setup("crowdsec-aws-waf-bouncer.log"); err != nil {
+		return bouncerConfig{}, err
 	}
 
 	if config.APIKey == "" && config.CertPath == "" && config.KeyPath == "" {
@@ -252,7 +207,7 @@ func newConfig(configPath string) (bouncerConfig, error) {
 	if config.APIUrl == "" {
 		return bouncerConfig{}, fmt.Errorf("api_url is required")
 	}
-	
+
 	if !strings.HasSuffix(config.APIUrl, "/") {
 		config.APIUrl = config.APIUrl + "/"
 	}
@@ -262,13 +217,13 @@ func newConfig(configPath string) (bouncerConfig, error) {
 	}
 
 	for _, action := range config.SupportedActions {
-		if !contains(validActions, action) {
-			return bouncerConfig{}, fmt.Errorf("supported_actions must be a list from %v", validActions)
+		if !slices.Contains(ValidActions, action) {
+			return bouncerConfig{}, fmt.Errorf("supported_actions must be a list from %v", ValidActions)
 		}
 	}
 
 	if len(config.SupportedActions) == 0 {
-		config.SupportedActions = validActions
+		config.SupportedActions = ValidActions
 	}
 
 	if len(config.WebACLConfig) == 0 {
@@ -278,8 +233,8 @@ func newConfig(configPath string) (bouncerConfig, error) {
 		if c.FallbackAction == "" {
 			return bouncerConfig{}, fmt.Errorf("fallback_action is required")
 		}
-		if !contains(validActions, c.FallbackAction) {
-			return bouncerConfig{}, fmt.Errorf("fallback_action must be one of %v", validActions)
+		if !slices.Contains(ValidActions, c.FallbackAction) {
+			return bouncerConfig{}, fmt.Errorf("fallback_action must be one of %v", ValidActions)
 		}
 		if c.RuleGroupName == "" {
 			return bouncerConfig{}, fmt.Errorf("rule_group_name is required")
@@ -292,11 +247,11 @@ func newConfig(configPath string) (bouncerConfig, error) {
 			return bouncerConfig{}, fmt.Errorf("ip_header_position is required when ip_header is set")
 		}
 
-		if c.IPHeaderPosition != "" && !contains(validIpHeaderPosition, c.IPHeaderPosition) {
+		if c.IPHeaderPosition != "" && !slices.Contains(validIpHeaderPosition, c.IPHeaderPosition) {
 			return bouncerConfig{}, fmt.Errorf("ip_header_position must be one of %v", validIpHeaderPosition)
 		}
 
-		if !contains(validScopes, c.Scope) {
+		if !slices.Contains(validScopes, c.Scope) {
 			return bouncerConfig{}, fmt.Errorf("scope must be one of %v", validScopes)
 		}
 		if c.IpsetPrefix == "" {

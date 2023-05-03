@@ -1,4 +1,4 @@
-package main
+package waf
 
 import (
 	"github.com/aws/aws-sdk-go/aws"
@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 )
 
 type WAFIpSet struct {
@@ -38,7 +39,7 @@ func (w *WAFIpSet) Remove(ip string) {
 }
 
 func (w *WAFIpSet) Contains(ip string) bool {
-	return contains(w.ips, ip)
+	return slices.Contains(w.ips, ip)
 }
 
 func (w *WAFIpSet) RemoveAll() {

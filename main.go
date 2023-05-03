@@ -11,28 +11,24 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/coreos/go-systemd/v22/daemon"
-	"github.com/crowdsecurity/crowdsec/pkg/models"
-	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/version"
-	csbouncer "github.com/crowdsecurity/go-cs-bouncer"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/crowdsecurity/crowdsec/pkg/models"
+	csbouncer "github.com/crowdsecurity/go-cs-bouncer"
+
+	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/cfg"
+	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/version"
+	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/waf"
 )
 
-type Decisions struct {
-	v4Add        map[string][]*string
-	v6Add        map[string][]*string
-	v4Del        map[string][]*string
-	v6Del        map[string][]*string
-	countriesAdd map[string][]*string
-	countriesDel map[string][]*string
-}
-
-var wafInstances []*WAF = make([]*WAF, 0)
+var wafInstances []*waf.WAF = make([]*waf.WAF, 0)
 
 func cleanup() {
-	for _, waf := range wafInstances {
-		waf.logger.Infof("Cleaning up ressources")
-		err := waf.Cleanup()
+	for _, w := range wafInstances {
+		w.Logger.Infof("Cleaning up ressources")
+		err := w.Cleanup()
 		if err != nil {
 			log.Errorf("Error cleaning up WAF: %s", err)
 		}
@@ -52,37 +48,37 @@ func signalHandler() {
 	}()
 }
 
-func processDecisions(decisions *models.DecisionsStreamResponse, supportedActions []string) Decisions {
-	d := Decisions{
-		v4Add:        make(map[string][]*string),
-		v6Add:        make(map[string][]*string),
-		v4Del:        make(map[string][]*string),
-		v6Del:        make(map[string][]*string),
-		countriesAdd: make(map[string][]*string),
-		countriesDel: make(map[string][]*string),
+func processDecisions(decisions *models.DecisionsStreamResponse, supportedActions []string) waf.Decisions {
+	d := waf.Decisions{
+		V4Add:        make(map[string][]*string),
+		V6Add:        make(map[string][]*string),
+		V4Del:        make(map[string][]*string),
+		V6Del:        make(map[string][]*string),
+		CountriesAdd: make(map[string][]*string),
+		CountriesDel: make(map[string][]*string),
 	}
 
 	for _, decision := range decisions.New {
 		decisionType := strings.ToLower(*decision.Type)
-		if !contains(supportedActions, decisionType) {
+		if !slices.Contains(supportedActions, decisionType) {
 			decisionType = "fallback"
 		}
 		if strings.ToLower(*decision.Scope) == "ip" || strings.ToLower(*decision.Scope) == "range" {
 			if strings.Contains(*decision.Value, ":") {
 				if !strings.Contains(*decision.Value, "/") {
-					d.v6Add[decisionType] = append(d.v6Add[decisionType], aws.String(fmt.Sprintf("%s/128", *decision.Value)))
+					d.V6Add[decisionType] = append(d.V6Add[decisionType], aws.String(fmt.Sprintf("%s/128", *decision.Value)))
 				} else {
-					d.v6Add[decisionType] = append(d.v6Add[decisionType], decision.Value)
+					d.V6Add[decisionType] = append(d.V6Add[decisionType], decision.Value)
 				}
 			} else {
 				if !strings.Contains(*decision.Value, "/") {
-					d.v4Add[decisionType] = append(d.v4Add[decisionType], aws.String(fmt.Sprintf("%s/32", *decision.Value)))
+					d.V4Add[decisionType] = append(d.V4Add[decisionType], aws.String(fmt.Sprintf("%s/32", *decision.Value)))
 				} else {
-					d.v4Add[decisionType] = append(d.v4Add[decisionType], decision.Value)
+					d.V4Add[decisionType] = append(d.V4Add[decisionType], decision.Value)
 				}
 			}
 		} else if strings.ToLower(*decision.Scope) == "country" {
-			d.countriesAdd[decisionType] = append(d.countriesAdd[decisionType], decision.Value)
+			d.CountriesAdd[decisionType] = append(d.CountriesAdd[decisionType], decision.Value)
 		} else {
 			log.Errorf("unsupported scope: %s", *decision.Scope)
 		}
@@ -90,25 +86,25 @@ func processDecisions(decisions *models.DecisionsStreamResponse, supportedAction
 
 	for _, decision := range decisions.Deleted {
 		decisionType := strings.ToLower(*decision.Type)
-		if !contains(supportedActions, decisionType) {
+		if !slices.Contains(supportedActions, decisionType) {
 			decisionType = "fallback"
 		}
 		if strings.ToLower(*decision.Scope) == "ip" || strings.ToLower(*decision.Scope) == "range" {
 			if strings.Contains(*decision.Value, ":") {
 				if !strings.Contains(*decision.Value, "/") {
-					d.v6Del[decisionType] = append(d.v6Del[decisionType], aws.String(fmt.Sprintf("%s/128", *decision.Value)))
+					d.V6Del[decisionType] = append(d.V6Del[decisionType], aws.String(fmt.Sprintf("%s/128", *decision.Value)))
 				} else {
-					d.v6Del[decisionType] = append(d.v6Del[decisionType], decision.Value)
+					d.V6Del[decisionType] = append(d.V6Del[decisionType], decision.Value)
 				}
 			} else {
 				if !strings.Contains(*decision.Value, "/") {
-					d.v4Del[decisionType] = append(d.v4Del[decisionType], aws.String(fmt.Sprintf("%s/32", *decision.Value)))
+					d.V4Del[decisionType] = append(d.V4Del[decisionType], aws.String(fmt.Sprintf("%s/32", *decision.Value)))
 				} else {
-					d.v4Del[decisionType] = append(d.v4Del[decisionType], decision.Value)
+					d.V4Del[decisionType] = append(d.V4Del[decisionType], decision.Value)
 				}
 			}
 		} else if strings.ToLower(*decision.Scope) == "country" {
-			d.countriesDel[decisionType] = append(d.countriesDel[decisionType], decision.Value)
+			d.CountriesDel[decisionType] = append(d.CountriesDel[decisionType], decision.Value)
 		} else {
 			log.Errorf("unsupported scope: %s", *decision.Scope)
 		}
@@ -131,7 +127,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	config, err := newConfig(*configPath)
+	config, err := cfg.NewConfig(*configPath)
 
 	if debugMode != nil && *debugMode {
 		log.SetLevel(log.DebugLevel)
@@ -148,7 +144,7 @@ func main() {
 	if *testConfig {
 		for _, wafConfig := range config.WebACLConfig {
 			log.Debugf("Create WAF instance with config: %+v", wafConfig)
-			_, err := NewWaf(wafConfig)
+			_, err := waf.NewWaf(wafConfig)
 			if err != nil {
 				log.Fatalf("Configuration error: %s", err)
 			}
@@ -177,7 +173,7 @@ func main() {
 
 	for _, wafConfig := range config.WebACLConfig {
 		log.Debugf("Create WAF instance with config: %+v", wafConfig)
-		w, err := NewWaf(wafConfig)
+		w, err := waf.NewWaf(wafConfig)
 		if err != nil {
 			log.Errorf("could not create waf instance: %s", err)
 			return
@@ -212,7 +208,7 @@ func main() {
 			case <-ctx.Done():
 				log.Info("terminating bouncer process")
 				for _, w := range wafInstances {
-					w.t.Kill(nil)
+					w.T.Kill(nil)
 				}
 				return nil
 			case decisions := <-bouncer.Stream:
@@ -220,7 +216,7 @@ func main() {
 
 				d := processDecisions(decisions, config.SupportedActions)
 				for _, w := range wafInstances {
-					w.decisionsChan <- d
+					w.DecisionsChan <- d
 				}
 			}
 		}
