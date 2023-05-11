@@ -119,6 +119,7 @@ func main() {
 	traceMode := flag.Bool("trace", false, "set trace mode")
 	debugMode := flag.Bool("debug", false, "set debug mode")
 	testConfig := flag.Bool("t", false, "test config and exit")
+	showConfig := flag.Bool("T", false, "show full config (.yaml + .yaml.local) and exit")
 
 	flag.Parse()
 
@@ -128,6 +129,11 @@ func main() {
 	}
 
 	config, err := cfg.NewConfig(*configPath)
+
+	// if *showConfig {
+	//	fmt.Println(string(configBytes))
+	//	os.Exit(0)
+	// }
 
 	if debugMode != nil && *debugMode {
 		log.SetLevel(log.DebugLevel)
