@@ -24,7 +24,7 @@ import (
 	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/waf"
 )
 
-var wafInstances []*waf.WAF = make([]*waf.WAF, 0)
+var wafInstances = make([]*waf.WAF, 0)
 
 func cleanup() {
 	for _, w := range wafInstances {
@@ -129,9 +129,14 @@ func main() {
 		os.Exit(0)
 	}
 
-	configBytes, err := cfg.MergedConfig(*configPath)
-	if err != nil {
-		log.Fatalf("could not read configuration: %s", err)
+	configBytes := []byte{}
+	var err error
+
+	if configPath != nil && *configPath != "" {
+		configBytes, err = cfg.MergedConfig(*configPath)
+		if err != nil {
+			log.Fatalf("could not read configuration: %s", err)
+		}
 	}
 
 	if *showConfig {

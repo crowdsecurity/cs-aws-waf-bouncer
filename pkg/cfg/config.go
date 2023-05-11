@@ -279,7 +279,7 @@ func MergedConfig(configPath string) ([]byte, error) {
 }
 
 func NewConfig(reader io.Reader) (bouncerConfig, error) {
-	var config bouncerConfig
+	config := bouncerConfig{}
 
 	content, err := io.ReadAll(reader)
 	if err != nil {
@@ -288,6 +288,10 @@ func NewConfig(reader io.Reader) (bouncerConfig, error) {
 
 	if err = yaml.UnmarshalStrict(content, &config); err != nil {
 		return bouncerConfig{}, err
+	}
+
+	if len(content) == 0 {
+		log.Info("Empty or missing configuration file: using envvars only")
 	}
 
 	getConfigFromEnv(&config)
