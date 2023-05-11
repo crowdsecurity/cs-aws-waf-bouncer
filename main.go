@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -128,12 +129,17 @@ func main() {
 		os.Exit(0)
 	}
 
-	config, err := cfg.NewConfig(*configPath)
+	configBytes, err := cfg.MergedConfig(*configPath)
+	if err != nil {
+		log.Fatalf("could not read configuration: %s", err)
+	}
 
-	// if *showConfig {
-	//	fmt.Println(string(configBytes))
-	//	os.Exit(0)
-	// }
+	if *showConfig {
+		fmt.Println(string(configBytes))
+		os.Exit(0)
+	}
+
+	config, err := cfg.NewConfig(bytes.NewReader(configBytes))
 
 	if debugMode != nil && *debugMode {
 		log.SetLevel(log.DebugLevel)
