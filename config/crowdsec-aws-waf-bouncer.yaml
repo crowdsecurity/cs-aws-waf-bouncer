@@ -1,4 +1,4 @@
-api_key: $API_KEY
+api_key: ${API_KEY}
 api_url: "http://127.0.0.1:8080/"
 update_frequency: 10s
 log_media: file
