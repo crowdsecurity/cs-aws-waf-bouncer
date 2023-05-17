@@ -26,7 +26,7 @@ import (
 
 var wafInstances = make([]*waf.WAF, 0)
 
-func cleanup() {
+func resourceCleanup() {
 	for _, w := range wafInstances {
 		w.Logger.Infof("Cleaning up ressources")
 		err := w.Cleanup()
@@ -34,19 +34,24 @@ func cleanup() {
 			log.Errorf("Error cleaning up WAF: %s", err)
 		}
 	}
-	os.Exit(0)
 }
 
-func signalHandler() {
+func HandleSignals(ctx context.Context) error {
 	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan,
-		syscall.SIGTERM,
-		syscall.SIGINT)
-	go func() {
-		<-signalChan
-		log.Info("Received SIGTERM, exiting")
-		cleanup()
-	}()
+	signal.Notify(signalChan, syscall.SIGTERM, syscall.SIGINT)
+
+	select {
+	case s := <-signalChan:
+		switch s {
+		case syscall.SIGTERM:
+			return fmt.Errorf("received SIGTERM")
+		case syscall.SIGINT:
+			return fmt.Errorf("received SIGINT")
+		}
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	return nil
 }
 
 func processDecisions(decisions *models.DecisionsStreamResponse, supportedActions []string) waf.Decisions {
@@ -186,7 +191,7 @@ func Execute() error {
 		log.Fatalf(err.Error())
 	}
 
-	defer cleanup()
+	defer resourceCleanup()
 
 	for _, wafConfig := range config.WebACLConfig {
 		log.Debugf("Create WAF instance with config: %+v", wafConfig)
@@ -203,7 +208,9 @@ func Execute() error {
 
 	g, ctx := errgroup.WithContext(context.Background())
 
-	go signalHandler()
+	g.Go(func() error {
+		return HandleSignals(ctx)
+	})
 
 	g.Go(func() error {
 		bouncer.Run(ctx)
@@ -239,7 +246,7 @@ func Execute() error {
 	})
 
 	if err := g.Wait(); err != nil {
-		return fmt.Errorf("process return with error: %w", err)
+		return fmt.Errorf("process terminated with error: %w", err)
 	}
 
 	return nil
