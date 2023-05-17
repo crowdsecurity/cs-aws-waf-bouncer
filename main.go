@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -23,7 +24,7 @@ import (
 	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/waf"
 )
 
-var wafInstances []*waf.WAF = make([]*waf.WAF, 0)
+var wafInstances = make([]*waf.WAF, 0)
 
 func cleanup() {
 	for _, w := range wafInstances {
@@ -119,6 +120,7 @@ func main() {
 	traceMode := flag.Bool("trace", false, "set trace mode")
 	debugMode := flag.Bool("debug", false, "set debug mode")
 	testConfig := flag.Bool("t", false, "test config and exit")
+	showConfig := flag.Bool("T", false, "show full config (.yaml + .yaml.local) and exit")
 
 	flag.Parse()
 
@@ -127,7 +129,22 @@ func main() {
 		os.Exit(0)
 	}
 
-	config, err := cfg.NewConfig(*configPath)
+	configBytes := []byte{}
+	var err error
+
+	if configPath != nil && *configPath != "" {
+		configBytes, err = cfg.MergedConfig(*configPath)
+		if err != nil {
+			log.Fatalf("could not read configuration: %s", err)
+		}
+	}
+
+	if *showConfig {
+		fmt.Println(string(configBytes))
+		os.Exit(0)
+	}
+
+	config, err := cfg.NewConfig(bytes.NewReader(configBytes))
 
 	if debugMode != nil && *debugMode {
 		log.SetLevel(log.DebugLevel)

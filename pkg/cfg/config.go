@@ -2,6 +2,7 @@ package cfg
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -10,6 +11,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
 	"gopkg.in/yaml.v2"
+
+	"github.com/crowdsecurity/crowdsec/pkg/yamlpatch"
 )
 
 type bouncerConfig struct {
@@ -178,95 +181,82 @@ func getConfigFromEnv(config *bouncerConfig) {
 	}
 }
 
-func NewConfig(configPath string) (bouncerConfig, error) {
-	var config bouncerConfig
-	ipsetPrefix := make(map[string]bool)
-	ruleGroupNames := make(map[string]bool)
-
-	if configPath != "" {
-		content, err := os.ReadFile(configPath)
-		if err != nil {
-			return bouncerConfig{}, err
-		}
-		err = yaml.UnmarshalStrict(content, &config)
-		if err != nil {
-			return bouncerConfig{}, err
-		}
+func (c *bouncerConfig) ValidateAndSetDefaults() error {
+	if err := c.Logging.setup("crowdsec-aws-waf-bouncer.log"); err != nil {
+		return err
 	}
 
-	getConfigFromEnv(&config)
-
-	if err := config.Logging.setup("crowdsec-aws-waf-bouncer.log"); err != nil {
-		return bouncerConfig{}, err
+	if c.APIKey == "" && c.CertPath == "" && c.KeyPath == "" {
+		return fmt.Errorf("api_key or certificates paths are required")
 	}
 
-	if config.APIKey == "" && config.CertPath == "" && config.KeyPath == "" {
-		return bouncerConfig{}, fmt.Errorf("api_key or certificates paths are required")
+	if c.APIUrl == "" {
+		return fmt.Errorf("api_url is required")
 	}
 
-	if config.APIUrl == "" {
-		return bouncerConfig{}, fmt.Errorf("api_url is required")
+	if !strings.HasSuffix(c.APIUrl, "/") {
+		c.APIUrl = c.APIUrl + "/"
 	}
 
-	if !strings.HasSuffix(config.APIUrl, "/") {
-		config.APIUrl = config.APIUrl + "/"
+	if c.UpdateFrequency == "" {
+		c.UpdateFrequency = "10s"
 	}
 
-	if config.UpdateFrequency == "" {
-		config.UpdateFrequency = "10s"
-	}
-
-	for _, action := range config.SupportedActions {
+	for _, action := range c.SupportedActions {
 		if !slices.Contains(ValidActions, action) {
-			return bouncerConfig{}, fmt.Errorf("supported_actions must be a list from %v", ValidActions)
+			return fmt.Errorf("supported_actions must be a list from %v", ValidActions)
 		}
 	}
 
-	if len(config.SupportedActions) == 0 {
-		config.SupportedActions = ValidActions
+	if len(c.SupportedActions) == 0 {
+		c.SupportedActions = ValidActions
 	}
 
-	if len(config.WebACLConfig) == 0 {
-		return bouncerConfig{}, fmt.Errorf("waf_config is required")
+	if len(c.WebACLConfig) == 0 {
+		return fmt.Errorf("waf_config is required")
 	}
-	for _, c := range config.WebACLConfig {
+	for _, c := range c.WebACLConfig {
 		if c.FallbackAction == "" {
-			return bouncerConfig{}, fmt.Errorf("fallback_action is required")
+			return fmt.Errorf("fallback_action is required")
 		}
 		if !slices.Contains(ValidActions, c.FallbackAction) {
-			return bouncerConfig{}, fmt.Errorf("fallback_action must be one of %v", ValidActions)
+			return fmt.Errorf("fallback_action must be one of %v", ValidActions)
 		}
 		if c.RuleGroupName == "" {
-			return bouncerConfig{}, fmt.Errorf("rule_group_name is required")
+			return fmt.Errorf("rule_group_name is required")
 		}
 		if c.Scope == "" {
-			return bouncerConfig{}, fmt.Errorf("scope is required")
+			return fmt.Errorf("scope is required")
 		}
 
 		if c.IPHeader != "" && c.IPHeaderPosition == "" {
-			return bouncerConfig{}, fmt.Errorf("ip_header_position is required when ip_header is set")
+			return fmt.Errorf("ip_header_position is required when ip_header is set")
 		}
 
 		if c.IPHeaderPosition != "" && !slices.Contains(validIpHeaderPosition, c.IPHeaderPosition) {
-			return bouncerConfig{}, fmt.Errorf("ip_header_position must be one of %v", validIpHeaderPosition)
+			return fmt.Errorf("ip_header_position must be one of %v", validIpHeaderPosition)
 		}
 
 		if !slices.Contains(validScopes, c.Scope) {
-			return bouncerConfig{}, fmt.Errorf("scope must be one of %v", validScopes)
+			return fmt.Errorf("scope must be one of %v", validScopes)
 		}
 		if c.IpsetPrefix == "" {
-			return bouncerConfig{}, fmt.Errorf("ipset_prefix is required")
+			return fmt.Errorf("ipset_prefix is required")
 		}
 		if c.Region == "" && strings.ToUpper(c.Scope) == "REGIONAL" {
-			return bouncerConfig{}, fmt.Errorf("region is required when scope is REGIONAL")
+			return fmt.Errorf("region is required when scope is REGIONAL")
 		}
+
+		ipsetPrefix := make(map[string]bool)
+		ruleGroupNames := make(map[string]bool)
+
 		if _, ok := ipsetPrefix[c.IpsetPrefix]; ok {
-			return bouncerConfig{}, fmt.Errorf("ipset_prefix value must be unique")
+			return fmt.Errorf("ipset_prefix value must be unique")
 		} else {
 			ipsetPrefix[c.IpsetPrefix] = true
 		}
 		if _, ok := ruleGroupNames[c.RuleGroupName]; ok {
-			return bouncerConfig{}, fmt.Errorf("rule_group_name value must be unique")
+			return fmt.Errorf("rule_group_name value must be unique")
 		} else {
 			ruleGroupNames[c.RuleGroupName] = true
 		}
@@ -275,5 +265,40 @@ func NewConfig(configPath string) (bouncerConfig, error) {
 			c.Capacity = 300
 		}
 	}
+
+	return nil
+}
+
+func MergedConfig(configPath string) ([]byte, error) {
+	patcher := yamlpatch.NewPatcher(configPath, ".local")
+	data, err := patcher.MergedPatchContent()
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func NewConfig(reader io.Reader) (bouncerConfig, error) {
+	config := bouncerConfig{}
+
+	content, err := io.ReadAll(reader)
+	if err != nil {
+		return bouncerConfig{}, err
+	}
+
+	if err = yaml.UnmarshalStrict(content, &config); err != nil {
+		return bouncerConfig{}, err
+	}
+
+	if len(content) == 0 {
+		log.Info("Empty or missing configuration file: using envvars only")
+	}
+
+	getConfigFromEnv(&config)
+
+	if err := config.ValidateAndSetDefaults(); err != nil {
+		return bouncerConfig{}, err
+	}
+
 	return config, nil
 }
