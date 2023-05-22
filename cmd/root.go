@@ -28,7 +28,7 @@ var wafInstances = make([]*waf.WAF, 0)
 
 func resourceCleanup() {
 	for _, w := range wafInstances {
-		w.Logger.Infof("Cleaning up ressources")
+		w.Logger.Infof("Cleaning up resources")
 		err := w.Cleanup()
 		if err != nil {
 			log.Errorf("Error cleaning up WAF: %s", err)

@@ -441,7 +441,7 @@ func (w *WAF) Cleanup() error {
 	var err error
 	w.lock.Lock()
 	defer w.lock.Unlock()
-	w.aclsInfo, w.setsInfos, w.ruleGroupsInfos, err = w.ListRessources()
+	w.aclsInfo, w.setsInfos, w.ruleGroupsInfos, err = w.ListResources()
 	if err != nil {
 		return fmt.Errorf("Failed to list WAF resources: %w", err)
 	}
@@ -452,7 +452,7 @@ func (w *WAF) Cleanup() error {
 	return w.CleanupAcl(acl, token)
 }
 
-func (w *WAF) ListRessources() (map[string]Acl, map[string]IpSet, map[string]RuleGroup, error) {
+func (w *WAF) ListResources() (map[string]Acl, map[string]IpSet, map[string]RuleGroup, error) {
 	var err error
 	acls, err := w.ListWebACL()
 	if err != nil {
@@ -471,10 +471,10 @@ func (w *WAF) ListRessources() (map[string]Acl, map[string]IpSet, map[string]Rul
 
 func (w *WAF) Init() error {
 	var err error
-	w.aclsInfo, w.setsInfos, w.ruleGroupsInfos, err = w.ListRessources()
+	w.aclsInfo, w.setsInfos, w.ruleGroupsInfos, err = w.ListResources()
 
 	if err != nil {
-		return fmt.Errorf("failed to list ressources: %s", err)
+		return fmt.Errorf("failed to list resources: %s", err)
 	}
 
 	w.Logger.Tracef("Found %d WebACLs", len(w.aclsInfo))
@@ -504,10 +504,10 @@ func (w *WAF) Init() error {
 		return fmt.Errorf("Failed to cleanup: %w", err)
 	}
 
-	w.aclsInfo, w.setsInfos, w.ruleGroupsInfos, err = w.ListRessources()
+	w.aclsInfo, w.setsInfos, w.ruleGroupsInfos, err = w.ListResources()
 
 	if err != nil {
-		return fmt.Errorf("failed to list ressources: %s", err)
+		return fmt.Errorf("failed to list resources: %s", err)
 	}
 
 	err = w.CreateRuleGroup(w.config.RuleGroupName)
@@ -529,7 +529,7 @@ func (w *WAF) Init() error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("failed to list ressources: %s", err)
+		return fmt.Errorf("failed to list resources: %s", err)
 	}
 
 	return nil
@@ -539,7 +539,7 @@ func (w *WAF) UpdateSetsContent(d Decisions) error {
 	var err error
 
 	if err != nil {
-		return fmt.Errorf("failed to list ressources: %s", err)
+		return fmt.Errorf("failed to list resources: %s", err)
 	}
 
 	for action, ips := range d.V4Add {
@@ -691,9 +691,9 @@ func (w *WAF) Process() error {
 		case decisions := <-w.DecisionsChan:
 			var err error
 			w.lock.Lock()
-			w.aclsInfo, w.setsInfos, w.ruleGroupsInfos, err = w.ListRessources()
+			w.aclsInfo, w.setsInfos, w.ruleGroupsInfos, err = w.ListResources()
 			if err != nil {
-				w.Logger.Errorf("Failed to list ressources: %s", err)
+				w.Logger.Errorf("Failed to list resources: %s", err)
 				w.lock.Unlock()
 				continue
 			}
