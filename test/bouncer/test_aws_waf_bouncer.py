@@ -105,7 +105,7 @@ def test_partial_config(bouncer, aw_cfg_factory):
 
     with bouncer(cfg) as aw:
         aw.wait_for_lines_fnmatch([
-            "*could not initialize waf instance: failed to list ressources: NoCredentialProviders: no valid providers in chain*"
+            "*could not initialize waf instance: failed to list resources: NoCredentialProviders: no valid providers in chain*"
         ])
 
         # this requires more time
