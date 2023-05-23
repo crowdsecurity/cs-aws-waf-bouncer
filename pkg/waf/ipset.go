@@ -6,7 +6,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/wafv2"
 	"github.com/google/uuid"
-
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
 )
