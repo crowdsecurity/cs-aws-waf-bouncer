@@ -128,14 +128,14 @@ func (w *WAF) CreateRuleGroup(ruleGroupName string) error {
 		if err != nil {
 			switch err.(type) {
 			case *wafv2.WAFUnavailableEntityException:
-				if maxRetries > 0 {
-					maxRetries -= 1
-					log.Warnf("Dependencies of rule group %s not ready yet, retrying in 2 seconds", w.config.RuleGroupName)
-					time.Sleep(2 * time.Second)
-					continue
-				} else {
+				if maxRetries == 0 {
 					return fmt.Errorf("WAF is not ready yet, giving up")
 				}
+
+				maxRetries -= 1
+				log.Warnf("Dependencies of rule group %s not ready yet, retrying in 2 seconds", w.config.RuleGroupName)
+				time.Sleep(2 * time.Second)
+				continue
 			default:
 				return err
 			}
@@ -351,14 +351,14 @@ func (w *WAF) AddRuleGroupToACL(acl *wafv2.WebACL, token *string) error {
 		if err != nil {
 			switch err.(type) {
 			case *wafv2.WAFUnavailableEntityException:
-				if maxRetries > 0 {
-					maxRetries -= 1
-					log.Warnf("rule group %s is not ready yet, retrying in 2 seconds", w.config.RuleGroupName)
-					time.Sleep(2 * time.Second)
-					continue
-				} else {
+				if maxRetries == 0 {
 					return fmt.Errorf("rule group %s is not ready, giving up", w.config.RuleGroupName)
 				}
+
+				maxRetries -= 1
+				log.Warnf("rule group %s is not ready yet, retrying in 2 seconds", w.config.RuleGroupName)
+				time.Sleep(2 * time.Second)
+				continue
 			default:
 				return err
 			}
@@ -640,7 +640,6 @@ func (w *WAF) UpdateGeoSet(d Decisions) error {
 				Action:           w.getRuleAction(action),
 			}
 			rg.Rules = append(rg.Rules, rules[action])
-
 		} else if rules[action] != nil { //We have a rule for this action
 			w.Logger.Infof("Updating rule %s for action %s", *rules[action].Name, action)
 			decisions[action] = append(decisions[action], rules[action].Statement.GeoMatchStatement.CountryCodes...)
