@@ -12,7 +12,7 @@ import (
 	"golang.org/x/exp/slices"
 	"gopkg.in/yaml.v2"
 
-	"github.com/crowdsecurity/crowdsec/pkg/yamlpatch"
+	"github.com/crowdsecurity/go-cs-lib/pkg/yamlpatch"
 )
 
 type bouncerConfig struct {
@@ -59,13 +59,14 @@ func getConfigFromEnv(config *bouncerConfig) {
 	for _, env := range os.Environ() {
 		if strings.HasPrefix(env, "BOUNCER_") {
 			s := strings.Split(env, "=")
-			if len(s) == 2 {
-				key = strings.Split(env, "=")[0]
-				value = strings.Split(env, "=")[1]
-			} else {
+			if len(s) != 2 {
 				log.Warnf("Invalid environment variable: %s", env)
 				continue
 			}
+
+			key = s[0]
+			value = s[1]
+
 			if strings.HasPrefix(key, "BOUNCER_WAF_CONFIG_") {
 				k2 := strings.TrimPrefix(key, "BOUNCER_WAF_CONFIG_")
 				if k2[0] < '0' || k2[0] > '9' || len(k2) < 3 {
@@ -252,14 +253,15 @@ func (c *bouncerConfig) ValidateAndSetDefaults() error {
 
 		if _, ok := ipsetPrefix[c.IpsetPrefix]; ok {
 			return fmt.Errorf("ipset_prefix value must be unique")
-		} else {
-			ipsetPrefix[c.IpsetPrefix] = true
 		}
+
+		ipsetPrefix[c.IpsetPrefix] = true
+
 		if _, ok := ruleGroupNames[c.RuleGroupName]; ok {
 			return fmt.Errorf("rule_group_name value must be unique")
-		} else {
-			ruleGroupNames[c.RuleGroupName] = true
 		}
+
+		ruleGroupNames[c.RuleGroupName] = true
 
 		if c.Capacity == 0 {
 			c.Capacity = 300
