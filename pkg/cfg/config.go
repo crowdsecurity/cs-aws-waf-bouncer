@@ -12,7 +12,7 @@ import (
 	"golang.org/x/exp/slices"
 	"gopkg.in/yaml.v2"
 
-	"github.com/crowdsecurity/crowdsec/pkg/yamlpatch"
+	"github.com/crowdsecurity/go-cs-lib/pkg/yamlpatch"
 )
 
 type bouncerConfig struct {

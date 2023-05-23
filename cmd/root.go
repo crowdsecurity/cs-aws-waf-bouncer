@@ -19,8 +19,9 @@ import (
 	"github.com/crowdsecurity/crowdsec/pkg/models"
 	csbouncer "github.com/crowdsecurity/go-cs-bouncer"
 
+	"github.com/crowdsecurity/go-cs-lib/pkg/version"
+
 	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/cfg"
-	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/version"
 	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/waf"
 )
 
@@ -130,7 +131,7 @@ func Execute() error {
 	flag.Parse()
 
 	if *bouncerVersion {
-		fmt.Printf("%s", version.ShowStr())
+		fmt.Printf("%s", version.FullString())
 		return nil
 	}
 
@@ -180,7 +181,7 @@ func Execute() error {
 		APIUrl:             config.APIUrl,
 		TickerInterval:     config.UpdateFrequency,
 		InsecureSkipVerify: aws.Bool(config.InsecureSkipVerify),
-		UserAgent:          fmt.Sprintf("crowdsec-aws-waf-bouncer/%s", version.VersionStr()),
+		UserAgent:          fmt.Sprintf("crowdsec-aws-waf-bouncer/%s", version.String()),
 		Scopes:             []string{"ip", "range", "country"},
 		CertPath:           config.CertPath,
 		KeyPath:            config.KeyPath,
