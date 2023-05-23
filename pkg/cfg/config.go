@@ -12,6 +12,7 @@ import (
 	"golang.org/x/exp/slices"
 	"gopkg.in/yaml.v2"
 
+	"github.com/crowdsecurity/go-cs-lib/pkg/csstring"
 	"github.com/crowdsecurity/go-cs-lib/pkg/yamlpatch"
 )
 
@@ -288,8 +289,10 @@ func NewConfig(reader io.Reader) (bouncerConfig, error) {
 		return bouncerConfig{}, err
 	}
 
-	if err = yaml.UnmarshalStrict(content, &config); err != nil {
-		return bouncerConfig{}, err
+	configBuff := csstring.StrictExpand(string(content), os.LookupEnv)
+
+	if err = yaml.UnmarshalStrict([]byte(configBuff), &config); err != nil {
+		return bouncerConfig{}, fmt.Errorf("failed to unmarshal: %s", err)
 	}
 
 	if len(content) == 0 {
