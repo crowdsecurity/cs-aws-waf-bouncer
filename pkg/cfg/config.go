@@ -174,7 +174,6 @@ func getConfigFromEnv(config *bouncerConfig) {
 				case "BOUNCER_SUPPORTED_ACTIONS":
 					config.SupportedActions = strings.Split(value, ",")
 				}
-
 			}
 		}
 	}
