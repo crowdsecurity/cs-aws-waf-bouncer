@@ -430,10 +430,6 @@ func (w *WAF) CleanupAcl(acl *wafv2.WebACL, token *string) error {
 		log.Debugf("RuleGroup %s not found, nothing to do", w.config.RuleGroupName)
 	}
 
-	if err != nil {
-		return fmt.Errorf("failed to list IPSets: %w", err)
-	}
-
 	w.ipsetManager.DeleteSets()
 
 	return nil
@@ -530,19 +526,11 @@ func (w *WAF) Init() error {
 		return fmt.Errorf("failed to add RuleGroup %s to WebACL %s: %w", w.config.RuleGroupName, w.config.WebACLName, err)
 	}
 
-	if err != nil {
-		return fmt.Errorf("failed to list resources: %s", err)
-	}
-
 	return nil
 }
 
 func (w *WAF) UpdateSetsContent(d Decisions) error {
 	var err error
-
-	if err != nil {
-		return fmt.Errorf("failed to list resources: %s", err)
-	}
 
 	for action, ips := range d.V4Add {
 		if action == "fallback" {
