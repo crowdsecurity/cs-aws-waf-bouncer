@@ -21,6 +21,8 @@ github.com/crowdsecurity/go-cs-bouncer v0.0.5 h1:vZ989qKUDTavycjGLjqm2M6UzXJpmLa
 github.com/crowdsecurity/go-cs-bouncer v0.0.5/go.mod h1:ShrcSSYmzBTKnpqON9/UFvorDMhhn5mbeQC2HXCv7kE=
 github.com/crowdsecurity/go-cs-lib v0.0.0-20230522124854-671e895fa788 h1:1tjqkYUmbkbYqa21kZsgSWaPIwGyUW0xE/sbb1zpJHg=
 github.com/crowdsecurity/go-cs-lib v0.0.0-20230522124854-671e895fa788/go.mod h1:9JJLSpGj1ZXnROV3xAcJvS/HTaUvuA8K3gGOpO4tfVc=
+github.com/crowdsecurity/go-cs-lib v0.0.0-20230531105801-4c1535c2b3bd h1:Y70ceDKAKYFXTnxEjXuBDSh07umvDhbX3PCCYhdtsZ0=
+github.com/crowdsecurity/go-cs-lib v0.0.0-20230531105801-4c1535c2b3bd/go.mod h1:9JJLSpGj1ZXnROV3xAcJvS/HTaUvuA8K3gGOpO4tfVc=
 github.com/crowdsecurity/grokky v0.2.1 h1:t4VYnDlAd0RjDM2SlILalbwfCrQxtJSMGdQOR0zwkE4=
 github.com/crowdsecurity/grokky v0.2.1/go.mod h1:33usDIYzGDsgX1kHAThCbseso6JuWNJXOzRQDGXHtWM=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
