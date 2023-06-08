@@ -7,7 +7,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/crowdsecurity/crowdsec v1.5.2
 	github.com/crowdsecurity/go-cs-bouncer v0.0.5
-	github.com/crowdsecurity/go-cs-lib v0.0.0-20230522124854-671e895fa788
+	github.com/crowdsecurity/go-cs-lib v0.0.2
 	github.com/google/uuid v1.3.0
 	github.com/sirupsen/logrus v1.9.2
 	golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53
