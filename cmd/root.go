@@ -164,6 +164,8 @@ func Execute() error {
 		return fmt.Errorf("could not parse configuration: %w", err)
 	}
 
+	log.Infof("Starting crowdsec-aws-waf-bouncer %s", version.String())
+
 	if *testConfig {
 		for _, wafConfig := range config.WebACLConfig {
 			log.Debugf("Create WAF instance with config: %+v", wafConfig)
