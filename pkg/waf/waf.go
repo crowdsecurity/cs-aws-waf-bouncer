@@ -65,15 +65,17 @@ func (w *WAF) getWafStatement(actionType string) *wafv2.Statement {
 			sets = append(sets, ipset)
 		}
 	}
-	if len(sets) == 0 {
+
+	switch len(sets) {
+	case 0:
 		w.Logger.Debugf("No ipset for action %s", actionType)
 		return nil
-	} else if len(sets) == 1 {
+	case 1:
 		w.Logger.Debugf("One ipset for action %s", actionType)
 		return &wafv2.Statement{
 			IPSetReferenceStatement: sets[0].ToStatement(w.config.IPHeader, w.config.IPHeaderPosition),
 		}
-	} else {
+	default:
 		w.Logger.Debugf("Multiple ipsets for action %s", actionType)
 		return &wafv2.Statement{
 			OrStatement: w.getIpSetReferenceStatement(sets),
@@ -412,24 +414,20 @@ func (w *WAF) CleanupAcl(acl *wafv2.WebACL, token *string) error {
 	err := w.RemoveRuleGroupFromACL(acl, token)
 
 	if err != nil {
-		return fmt.Errorf("Error removing rule group from ACL: %w", err)
+		return fmt.Errorf("error removing rule group from ACL: %w", err)
 	}
 	if _, ok := w.ruleGroupsInfos[w.config.RuleGroupName]; ok {
 		token, _, err := w.GetRuleGroup(w.config.RuleGroupName)
 		if err != nil {
-			return fmt.Errorf("Failed to get RuleGroup %s: %w", w.config.RuleGroupName, err)
+			return fmt.Errorf("failed to get RuleGroup %s: %w", w.config.RuleGroupName, err)
 		}
 		w.Logger.Debugf("Deleting RuleGroup %s", w.config.RuleGroupName)
 		err = w.DeleteRuleGroup(w.config.RuleGroupName, token, w.ruleGroupsInfos[w.config.RuleGroupName].Id)
 		if err != nil {
-			return fmt.Errorf("Failed to delete RuleGroup %s: %w", w.config.RuleGroupName, err)
+			return fmt.Errorf("failed to delete RuleGroup %s: %w", w.config.RuleGroupName, err)
 		}
 	} else {
 		log.Debugf("RuleGroup %s not found, nothing to do", w.config.RuleGroupName)
-	}
-
-	if err != nil {
-		return fmt.Errorf("Failed to list IPSets: %w", err)
 	}
 
 	w.ipsetManager.DeleteSets()
@@ -443,11 +441,11 @@ func (w *WAF) Cleanup() error {
 	defer w.lock.Unlock()
 	w.aclsInfo, w.setsInfos, w.ruleGroupsInfos, err = w.ListResources()
 	if err != nil {
-		return fmt.Errorf("Failed to list WAF resources: %w", err)
+		return fmt.Errorf("failed to list WAF resources: %w", err)
 	}
 	acl, token, err := w.GetWebACL(w.config.WebACLName, w.aclsInfo[w.config.WebACLName].Id)
 	if err != nil {
-		return fmt.Errorf("Failed to get WebACL: %w", err)
+		return fmt.Errorf("failed to get WebACL: %w", err)
 	}
 	return w.CleanupAcl(acl, token)
 }
@@ -493,7 +491,7 @@ func (w *WAF) Init() error {
 	acl, token, err := w.GetWebACL(w.config.WebACLName, w.aclsInfo[w.config.WebACLName].Id)
 
 	if err != nil {
-		return fmt.Errorf("Failed to get WebACL: %w", err)
+		return fmt.Errorf("failed to get WebACL: %w", err)
 	}
 
 	w.ipsetManager = NewIPSetManager(w.config.IpsetPrefix, w.config.Scope, w.client, w.Logger)
@@ -501,7 +499,7 @@ func (w *WAF) Init() error {
 	err = w.CleanupAcl(acl, token)
 
 	if err != nil {
-		return fmt.Errorf("Failed to cleanup: %w", err)
+		return fmt.Errorf("failed to cleanup: %w", err)
 	}
 
 	w.aclsInfo, w.setsInfos, w.ruleGroupsInfos, err = w.ListResources()
@@ -513,23 +511,19 @@ func (w *WAF) Init() error {
 	err = w.CreateRuleGroup(w.config.RuleGroupName)
 
 	if err != nil {
-		return fmt.Errorf("Failed to create RuleGroup %s: %w", w.config.RuleGroupName, err)
+		return fmt.Errorf("failed to create RuleGroup %s: %w", w.config.RuleGroupName, err)
 	}
 
 	acl, lockTocken, err := w.GetWebACL(w.config.WebACLName, w.aclsInfo[w.config.WebACLName].Id)
 
 	if err != nil {
-		return fmt.Errorf("Failed to get WebACL %s: %w", w.config.WebACLName, err)
+		return fmt.Errorf("failed to get WebACL %s: %w", w.config.WebACLName, err)
 	}
 
 	err = w.AddRuleGroupToACL(acl, lockTocken)
 
 	if err != nil {
-		return fmt.Errorf("Failed to add RuleGroup %s to WebACL %s: %w", w.config.RuleGroupName, w.config.WebACLName, err)
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to list resources: %s", err)
+		return fmt.Errorf("failed to add RuleGroup %s to WebACL %s: %w", w.config.RuleGroupName, w.config.WebACLName, err)
 	}
 
 	return nil
@@ -537,10 +531,6 @@ func (w *WAF) Init() error {
 
 func (w *WAF) UpdateSetsContent(d Decisions) error {
 	var err error
-
-	if err != nil {
-		return fmt.Errorf("failed to list resources: %s", err)
-	}
 
 	for action, ips := range d.V4Add {
 		if action == "fallback" {
@@ -579,13 +569,13 @@ func (w *WAF) UpdateSetsContent(d Decisions) error {
 	}
 	err = w.ipsetManager.Commit()
 	if err != nil {
-		return fmt.Errorf("Failed to commit ipset changes: %w", err)
+		return fmt.Errorf("failed to commit ipset changes: %w", err)
 	}
 
 	err = w.UpdateRuleGroup()
 
 	if err != nil {
-		return fmt.Errorf("Failed to update RuleGroup %s: %w", w.config.RuleGroupName, err)
+		return fmt.Errorf("failed to update RuleGroup %s: %w", w.config.RuleGroupName, err)
 	}
 	w.ipsetManager.DeleteEmptySets()
 	return nil
@@ -604,7 +594,7 @@ func (w *WAF) UpdateGeoSet(d Decisions) error {
 
 	token, rg, err := w.GetRuleGroup(w.config.RuleGroupName)
 	if err != nil {
-		return fmt.Errorf("Failed to get RuleGroup  %s for geoset update: %w", w.config.WebACLName, err)
+		return fmt.Errorf("failed to get RuleGroup  %s for geoset update: %w", w.config.WebACLName, err)
 	}
 
 	for _, rule := range rg.Rules {
@@ -672,7 +662,7 @@ func (w *WAF) UpdateGeoSet(d Decisions) error {
 		LockToken:        aws.String(token),
 	})
 	if err != nil {
-		return fmt.Errorf("Failed to update RuleGroup  %s for geoset update: %w", w.config.WebACLName, err)
+		return fmt.Errorf("failed to update RuleGroup  %s for geoset update: %w", w.config.WebACLName, err)
 	}
 	w.Logger.Debug("Updated RuleGroup for geomatch")
 

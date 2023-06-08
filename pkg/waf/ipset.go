@@ -160,7 +160,7 @@ func (w *WAFIpSet) Commit() error {
 	if currSet == nil {
 		summary, err := w.createIpSet()
 		if err != nil {
-			return fmt.Errorf("Failed to create IPSet %s: %w", w.name, err)
+			return fmt.Errorf("failed to create IPSet %s: %w", w.name, err)
 		}
 		w.arn = *summary.ARN
 		w.id = *summary.Id
