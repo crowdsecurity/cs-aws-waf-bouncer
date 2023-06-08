@@ -85,14 +85,29 @@ def test_tls_mutual(crowdsec, certs_dir, api_key_factory, bouncer, aw_cfg_factor
         port = cs.probe.get_bound_port('8080')
         cfg = aw_cfg_factory() | extra_config
         cfg['api_url'] = f'https://localhost:{port}'
+        cfg['ca_cert_path'] = (certs / 'ca.crt').as_posix()
+
+        cfg['cert_path'] = (certs / 'agent.crt').as_posix()
+        cfg['key_path'] = (certs / 'agent.key').as_posix()
+
+        with bouncer(cfg) as cb:
+            cb.wait_for_lines_fnmatch([
+                "*Starting crowdsec-aws-waf-bouncer*",
+                "*Using CA cert*",
+                "*Using cert auth with cert * and key *",
+                "*API error: access forbidden*",
+            ])
+
+        cs.wait_for_log("*client certificate OU (?agent-ou?) doesn't match expected OU (?bouncer-ou?)*")
+
         cfg['cert_path'] = (certs / 'bouncer.crt').as_posix()
         cfg['key_path'] = (certs / 'bouncer.key').as_posix()
-        cfg['ca_cert_path'] = (certs / 'ca.crt').as_posix()
 
         with bouncer(cfg) as aw:
             aw.wait_for_lines_fnmatch([
+                "*Starting crowdsec-aws-waf-bouncer*",
                 "*Using CA cert*",
-                "*Using cert auth with cert*",
+                "*Using cert auth with cert * and key *",
                 "*Starting processing decisions*",
                 "*Polling decisions*",
             ])
