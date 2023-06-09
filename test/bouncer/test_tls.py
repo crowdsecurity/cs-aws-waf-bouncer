@@ -1,3 +1,4 @@
+import json
 
 extra_config = {
     'waf_config': [
@@ -11,7 +12,6 @@ extra_config = {
         }
     ]
 }
-
 
 def test_tls_server(crowdsec, certs_dir, api_key_factory, bouncer, aw_cfg_factory):
     """TLS with server-only certificate"""
@@ -54,13 +54,14 @@ def test_tls_server(crowdsec, certs_dir, api_key_factory, bouncer, aw_cfg_factor
 
         with bouncer(cfg) as aw:
             aw.wait_for_lines_fnmatch([
+                "*Using CA cert *ca.crt*",
                 "*Using API key auth*",
                 "*Starting processing decisions*",
                 "*Polling decisions*",
             ])
 
 
-def test_tls_mutual(crowdsec, certs_dir, api_key_factory, bouncer, aw_cfg_factory):
+def test_tls_mutual(crowdsec, certs_dir, api_key_factory, bouncer, aw_cfg_factory, bouncer_under_test):
     """TLS with two-way bouncer/lapi authentication"""
 
     lapi_env = {
@@ -111,3 +112,12 @@ def test_tls_mutual(crowdsec, certs_dir, api_key_factory, bouncer, aw_cfg_factor
                 "*Starting processing decisions*",
                 "*Polling decisions*",
             ])
+
+            # check that the bouncer is registered
+            res = cs.cont.exec_run('cscli bouncers list -o json')
+            assert res.exit_code == 0
+            bouncers = json.loads(res.output)
+            assert len(bouncers) == 1
+            assert bouncers[0]['name'].startswith('@')
+            assert bouncers[0]['auth_type'] == 'tls'
+            assert bouncers[0]['type'] == bouncer_under_test
