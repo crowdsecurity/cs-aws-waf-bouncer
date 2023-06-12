@@ -6,7 +6,7 @@ require (
 	github.com/aws/aws-sdk-go v1.44.187
 	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/crowdsecurity/crowdsec v1.5.2
-	github.com/crowdsecurity/go-cs-bouncer v0.0.5
+	github.com/crowdsecurity/go-cs-bouncer v0.0.7
 	github.com/crowdsecurity/go-cs-lib v0.0.2
 	github.com/google/uuid v1.3.0
 	github.com/sirupsen/logrus v1.9.2
