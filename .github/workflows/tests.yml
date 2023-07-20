@@ -61,7 +61,6 @@ jobs:
         CROWDSEC_TEST_NETWORK: net-test
         CROWDSEC_TEST_TIMEOUT: 60
         PYTEST_ADDOPTS: --durations=0 -vv --color=yes -m "not (deb or rpm)"
-        CS_AWS_WAF_BOUNCER_TESTING: 1
       run: |
         # everything except for
         # - install (requires root, ignored by default)
