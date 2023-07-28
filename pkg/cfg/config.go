@@ -12,8 +12,8 @@ import (
 	"golang.org/x/exp/slices"
 	"gopkg.in/yaml.v2"
 
-	"github.com/crowdsecurity/go-cs-lib/pkg/csstring"
-	"github.com/crowdsecurity/go-cs-lib/pkg/yamlpatch"
+	"github.com/crowdsecurity/go-cs-lib/csstring"
+	"github.com/crowdsecurity/go-cs-lib/yamlpatch"
 )
 
 type bouncerConfig struct {
