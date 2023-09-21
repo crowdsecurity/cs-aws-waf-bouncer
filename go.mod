@@ -5,9 +5,9 @@ go 1.20
 require (
 	github.com/aws/aws-sdk-go v1.44.187
 	github.com/coreos/go-systemd/v22 v22.5.0
-	github.com/crowdsecurity/crowdsec v1.5.3-rc3
-	github.com/crowdsecurity/go-cs-bouncer v0.0.8
-	github.com/crowdsecurity/go-cs-lib v0.0.3
+	github.com/crowdsecurity/crowdsec v1.5.4-final
+	github.com/crowdsecurity/go-cs-bouncer v0.0.11
+	github.com/crowdsecurity/go-cs-lib v0.0.4
 	github.com/google/uuid v1.3.0
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
