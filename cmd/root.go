@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -19,11 +18,14 @@ import (
 	"github.com/crowdsecurity/crowdsec/pkg/models"
 	csbouncer "github.com/crowdsecurity/go-cs-bouncer"
 
+	"github.com/crowdsecurity/go-cs-lib/csstring"
 	"github.com/crowdsecurity/go-cs-lib/version"
 
 	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/cfg"
 	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/waf"
 )
+
+const bouncerType = "crowdsec-aws-waf-bouncer"
 
 var wafInstances = make([]*waf.WAF, 0)
 
@@ -120,6 +122,11 @@ func processDecisions(decisions *models.DecisionsStreamResponse, supportedAction
 	return d
 }
 
+// metricsUpdater receives a metrics struct with basic data and populates it with the current metrics.
+func metricsUpdater(met *models.RemediationComponentsMetricsItems0) {
+	log.Debugf("Updating metrics")
+}
+
 func Execute() error {
 	configPath := flag.String("c", "", "path to crowdsec-aws-waf-bouncer.yaml")
 	bouncerVersion := flag.Bool("version", false, "display version and exit")
@@ -135,22 +142,24 @@ func Execute() error {
 		return nil
 	}
 
-	configBytes := []byte{}
+	configMerged := []byte{}
 	var err error
 
 	if configPath != nil && *configPath != "" {
-		configBytes, err = cfg.MergedConfig(*configPath)
+		configMerged, err = cfg.MergedConfig(*configPath)
 		if err != nil {
 			return fmt.Errorf("could not read configuration: %w", err)
 		}
 	}
 
 	if *showConfig {
-		fmt.Println(string(configBytes))
+		fmt.Println(string(configMerged))
 		return nil
 	}
 
-	config, err := cfg.NewConfig(bytes.NewReader(configBytes))
+	configExpanded := csstring.StrictExpand(string(configMerged), os.LookupEnv)
+
+	config, err := cfg.NewConfig(strings.NewReader(configExpanded))
 
 	if debugMode != nil && *debugMode {
 		log.SetLevel(log.DebugLevel)
@@ -164,7 +173,7 @@ func Execute() error {
 		return fmt.Errorf("could not parse configuration: %w", err)
 	}
 
-	log.Infof("Starting crowdsec-aws-waf-bouncer %s", version.String())
+	log.Infof("Starting %s %s", bouncerType, version.String())
 
 	if *testConfig {
 		for _, wafConfig := range config.WebACLConfig {
@@ -183,7 +192,7 @@ func Execute() error {
 		APIUrl:             config.APIUrl,
 		TickerInterval:     config.UpdateFrequency,
 		InsecureSkipVerify: aws.Bool(config.InsecureSkipVerify),
-		UserAgent:          fmt.Sprintf("crowdsec-aws-waf-bouncer/%s", version.String()),
+		UserAgent:          fmt.Sprintf("%s/%s", bouncerType, version.String()),
 		Scopes:             []string{"ip", "range", "country"},
 		CertPath:           config.CertPath,
 		KeyPath:            config.KeyPath,
@@ -216,6 +225,17 @@ func Execute() error {
 
 	g.Go(func() error {
 		return HandleSignals(ctx)
+	})
+
+	interval := *bouncer.MetricsInterval
+
+	metricsProvider, err := csbouncer.NewMetricsProvider(bouncer.APIClient, bouncerType, interval, metricsUpdater, log.StandardLogger())
+	if err != nil {
+		return fmt.Errorf("unable to create metrics provider: %w", err)
+	}
+
+	g.Go(func() error {
+		return metricsProvider.Run(ctx)
 	})
 
 	g.Go(func() error {
