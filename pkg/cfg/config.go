@@ -51,10 +51,13 @@ var validScopes = []string{"REGIONAL", "CLOUDFRONT"}
 var validIpHeaderPosition = []string{"FIRST", "LAST", "ANY"}
 
 func getConfigFromEnv(config *bouncerConfig) {
-	var key string
-	var value string
-	var acl *AclConfig
-	var err error
+	var (
+		key   string
+		value string
+		acl   *AclConfig
+		err   error
+	)
+
 	acls := make(map[byte]*AclConfig, 0)
 
 	for _, env := range os.Environ() {
@@ -73,12 +76,14 @@ func getConfigFromEnv(config *bouncerConfig) {
 				if k2[0] < '0' || k2[0] > '9' || len(k2) < 3 {
 					log.Warnf("Invalid name for %s: BOUNCER_WAF_CONFIG_* must be in the form BOUNCER_WAF_CONFIG_0_XXX, BOUNCER_WAF_CONFIG_1_XXX", key)
 				}
+
 				if _, ok := acls[k2[0]]; !ok {
 					acl = &AclConfig{}
 					acls[k2[0]] = acl
 				} else {
 					acl = acls[k2[0]]
 				}
+
 				k2 = k2[2:]
 				switch k2 {
 				case "WEB_ACL_NAME":
@@ -177,6 +182,7 @@ func getConfigFromEnv(config *bouncerConfig) {
 			}
 		}
 	}
+
 	for _, v := range acls {
 		config.WebACLConfig = append(config.WebACLConfig, *v)
 	}
@@ -216,16 +222,20 @@ func (c *bouncerConfig) ValidateAndSetDefaults() error {
 	if len(c.WebACLConfig) == 0 {
 		return fmt.Errorf("waf_config is required")
 	}
+
 	for _, c := range c.WebACLConfig {
 		if c.FallbackAction == "" {
 			return fmt.Errorf("fallback_action is required")
 		}
+
 		if !slices.Contains(ValidActions, c.FallbackAction) {
 			return fmt.Errorf("fallback_action must be one of %v", ValidActions)
 		}
+
 		if c.RuleGroupName == "" {
 			return fmt.Errorf("rule_group_name is required")
 		}
+
 		if c.Scope == "" {
 			return fmt.Errorf("scope is required")
 		}
@@ -241,9 +251,11 @@ func (c *bouncerConfig) ValidateAndSetDefaults() error {
 		if !slices.Contains(validScopes, c.Scope) {
 			return fmt.Errorf("scope must be one of %v", validScopes)
 		}
+
 		if c.IpsetPrefix == "" {
 			return fmt.Errorf("ipset_prefix is required")
 		}
+
 		if c.Region == "" && strings.ToUpper(c.Scope) == "REGIONAL" {
 			return fmt.Errorf("region is required when scope is REGIONAL")
 		}
@@ -274,9 +286,11 @@ func (c *bouncerConfig) ValidateAndSetDefaults() error {
 func MergedConfig(configPath string) ([]byte, error) {
 	patcher := yamlpatch.NewPatcher(configPath, ".local")
 	data, err := patcher.MergedPatchContent()
+
 	if err != nil {
 		return nil, err
 	}
+
 	return data, nil
 }
 

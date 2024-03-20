@@ -1,6 +1,7 @@
 package waf
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -9,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/wafv2"
-
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/tomb.v2"
 
@@ -53,6 +53,7 @@ func (w *WAF) getIpSetReferenceStatement(ipsets []*WAFIpSet) *wafv2.OrStatement 
 			IPSetReferenceStatement: ipset.ToStatement(w.config.IPHeader, w.config.IPHeaderPosition),
 		})
 	}
+
 	return &wafv2.OrStatement{
 		Statements: statements,
 	}
@@ -60,6 +61,7 @@ func (w *WAF) getIpSetReferenceStatement(ipsets []*WAFIpSet) *wafv2.OrStatement 
 
 func (w *WAF) getWafStatement(actionType string) *wafv2.Statement {
 	sets := make([]*WAFIpSet, 0)
+
 	for _, ipset := range w.ipsetManager.IPSets {
 		if ipset.GetDecisionType() == actionType && ipset.Size() > 0 {
 			sets = append(sets, ipset)
@@ -72,11 +74,13 @@ func (w *WAF) getWafStatement(actionType string) *wafv2.Statement {
 		return nil
 	case 1:
 		w.Logger.Debugf("One ipset for action %s", actionType)
+
 		return &wafv2.Statement{
 			IPSetReferenceStatement: sets[0].ToStatement(w.config.IPHeader, w.config.IPHeaderPosition),
 		}
 	default:
 		w.Logger.Debugf("Multiple ipsets for action %s", actionType)
+
 		return &wafv2.Statement{
 			OrStatement: w.getIpSetReferenceStatement(sets),
 		}
@@ -85,7 +89,9 @@ func (w *WAF) getWafStatement(actionType string) *wafv2.Statement {
 
 func (w *WAF) ListRuleGroups() (map[string]RuleGroup, error) {
 	rg := make(map[string]RuleGroup)
+
 	var marker *string
+
 	for {
 		output, err := w.client.ListRuleGroups(&wafv2.ListRuleGroupsInput{
 			Scope:      aws.String(w.config.Scope),
@@ -94,26 +100,30 @@ func (w *WAF) ListRuleGroups() (map[string]RuleGroup, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		for _, ruleGroup := range output.RuleGroups {
 			rg[*ruleGroup.Name] = RuleGroup{
 				ARN: *ruleGroup.ARN,
 				Id:  *ruleGroup.Id,
 			}
 		}
+
 		if output.NextMarker == nil {
 			break
 		}
+
 		marker = output.NextMarker
 	}
+
 	return rg, nil
 }
 
 func (w *WAF) CreateRuleGroup(ruleGroupName string) error {
-
 	maxRetries := 5
 
 	for {
 		w.Logger.Trace("before create rule group")
+
 		r, err := w.client.CreateRuleGroup(&wafv2.CreateRuleGroupInput{
 			Name:  aws.String(ruleGroupName),
 			Rules: nil,
@@ -131,23 +141,28 @@ func (w *WAF) CreateRuleGroup(ruleGroupName string) error {
 			switch err.(type) {
 			case *wafv2.WAFUnavailableEntityException:
 				if maxRetries == 0 {
-					return fmt.Errorf("WAF is not ready yet, giving up")
+					return errors.New("WAF is not ready yet, giving up")
 				}
 
 				maxRetries -= 1
+
 				log.Warnf("Dependencies of rule group %s not ready yet, retrying in 2 seconds", w.config.RuleGroupName)
 				time.Sleep(2 * time.Second)
+
 				continue
 			default:
 				return err
 			}
 		}
+
 		w.ruleGroupsInfos[ruleGroupName] = RuleGroup{
 			ARN: *r.Summary.ARN,
 			Id:  *r.Summary.Id,
 		}
+
 		break
 	}
+
 	return nil
 }
 
@@ -188,6 +203,7 @@ func (w *WAF) UpdateRuleGroup() error {
 				},
 			}
 			priority++
+
 			rules = append(rules, r)
 		}
 	}
@@ -198,8 +214,9 @@ func (w *WAF) UpdateRuleGroup() error {
 
 	for {
 		if maxRetries <= 0 {
-			return fmt.Errorf("WAF is not ready yet, giving up")
+			return errors.New("WAF is not ready yet, giving up")
 		}
+
 		_, err = w.client.UpdateRuleGroup(&wafv2.UpdateRuleGroupInput{
 			Name:             aws.String(w.config.RuleGroupName),
 			Rules:            rules,
@@ -213,12 +230,15 @@ func (w *WAF) UpdateRuleGroup() error {
 			case *wafv2.WAFUnavailableEntityException:
 				log.Warnf("Dependencies of rule group %s not ready yet, retrying in 2 seconds", w.config.RuleGroupName)
 				time.Sleep(2 * time.Second)
+
 				maxRetries--
+
 				continue
 			default:
 				return err
 			}
 		}
+
 		return nil
 	}
 }
@@ -230,23 +250,27 @@ func (w *WAF) DeleteRuleGroup(ruleGroupName string, token string, id string) err
 		LockToken: aws.String(token),
 		Id:        aws.String(id),
 	})
+
 	return err
 }
 
 func (w *WAF) ListWebACL() (map[string]Acl, error) {
 	acls := make(map[string]Acl)
+
 	r, err := w.client.ListWebACLs(&wafv2.ListWebACLsInput{
 		Scope: aws.String(w.config.Scope),
 	})
 	if err != nil {
 		return nil, err
 	}
+
 	for _, acl := range r.WebACLs {
 		acls[*acl.Name] = Acl{
 			ARN: *acl.ARN,
 			Id:  *acl.Id,
 		}
 	}
+
 	return acls, nil
 }
 
@@ -259,23 +283,27 @@ func (w *WAF) GetWebACL(aclName string, id string) (*wafv2.WebACL, *string, erro
 	if err != nil {
 		return nil, nil, err
 	}
+
 	return r.WebACL, r.LockToken, nil
 }
 
 func (w *WAF) ListIpSet() (map[string]IpSet, error) {
 	sets := make(map[string]IpSet)
+
 	r, err := w.client.ListIPSets(&wafv2.ListIPSetsInput{
 		Scope: aws.String(w.config.Scope),
 	})
 	if err != nil {
 		return nil, err
 	}
+
 	for _, set := range r.IPSets {
 		sets[*set.Name] = IpSet{
 			ARN: *set.ARN,
 			Id:  *set.Id,
 		}
 	}
+
 	return sets, nil
 }
 
@@ -299,14 +327,17 @@ func (w *WAF) getRuleAction(actionType string) *wafv2.RuleAction {
 }
 
 func (w *WAF) getPriority(acl *wafv2.WebACL) int64 {
-	//Find the lowest available priority
+	// Find the lowest available priority
 	lowest := int64(0)
+
 	for _, rule := range acl.Rules {
 		w.Logger.Debugf("Rule %s has priority %d", *rule.Name, *rule.Priority)
+
 		if *rule.Priority > lowest {
 			lowest = *rule.Priority
 		}
 	}
+
 	return lowest + 1
 }
 
@@ -358,16 +389,20 @@ func (w *WAF) AddRuleGroupToACL(acl *wafv2.WebACL, token *string) error {
 				}
 
 				maxRetries -= 1
+
 				log.Warnf("rule group %s is not ready yet, retrying in 2 seconds", w.config.RuleGroupName)
 				time.Sleep(2 * time.Second)
+
 				continue
 			default:
 				return err
 			}
 		}
+
 		break
 	}
 	w.Logger.Debugf("RuleGroup %s added to ACL %s", w.config.RuleGroupName, *acl.Name)
+
 	return nil
 }
 
@@ -375,11 +410,13 @@ func (w *WAF) RemoveRuleGroupFromACL(acl *wafv2.WebACL, token *string) error {
 	var newRules []*wafv2.Rule
 
 	w.Logger.Debugf("Removing rule group %s from ACL %s", w.config.RuleGroupName, *acl.Name)
+
 	for _, rule := range acl.Rules {
 		if *rule.Name != w.config.RuleGroupName {
 			newRules = append(newRules, rule)
 		}
 	}
+
 	_, err := w.client.UpdateWebACL(&wafv2.UpdateWebACLInput{
 		CaptchaConfig:        acl.CaptchaConfig,
 		CustomResponseBodies: acl.CustomResponseBodies,
@@ -395,6 +432,7 @@ func (w *WAF) RemoveRuleGroupFromACL(acl *wafv2.WebACL, token *string) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -407,21 +445,24 @@ func (w *WAF) GetRuleGroup(ruleGroupname string) (string, wafv2.RuleGroup, error
 	if err != nil {
 		return "", wafv2.RuleGroup{}, err
 	}
+
 	return *r.LockToken, *r.RuleGroup, nil
 }
 
 func (w *WAF) CleanupAcl(acl *wafv2.WebACL, token *string) error {
 	err := w.RemoveRuleGroupFromACL(acl, token)
-
 	if err != nil {
 		return fmt.Errorf("error removing rule group from ACL: %w", err)
 	}
+
 	if _, ok := w.ruleGroupsInfos[w.config.RuleGroupName]; ok {
 		token, _, err := w.GetRuleGroup(w.config.RuleGroupName)
 		if err != nil {
 			return fmt.Errorf("failed to get RuleGroup %s: %w", w.config.RuleGroupName, err)
 		}
+
 		w.Logger.Debugf("Deleting RuleGroup %s", w.config.RuleGroupName)
+
 		err = w.DeleteRuleGroup(w.config.RuleGroupName, token, w.ruleGroupsInfos[w.config.RuleGroupName].Id)
 		if err != nil {
 			return fmt.Errorf("failed to delete RuleGroup %s: %w", w.config.RuleGroupName, err)
@@ -437,33 +478,41 @@ func (w *WAF) CleanupAcl(acl *wafv2.WebACL, token *string) error {
 
 func (w *WAF) Cleanup() error {
 	var err error
+
 	w.lock.Lock()
 	defer w.lock.Unlock()
+
 	w.aclsInfo, w.setsInfos, w.ruleGroupsInfos, err = w.ListResources()
 	if err != nil {
 		return fmt.Errorf("failed to list WAF resources: %w", err)
 	}
+
 	acl, token, err := w.GetWebACL(w.config.WebACLName, w.aclsInfo[w.config.WebACLName].Id)
 	if err != nil {
 		return fmt.Errorf("failed to get WebACL: %w", err)
 	}
+
 	return w.CleanupAcl(acl, token)
 }
 
 func (w *WAF) ListResources() (map[string]Acl, map[string]IpSet, map[string]RuleGroup, error) {
 	var err error
+
 	acls, err := w.ListWebACL()
 	if err != nil {
 		return nil, nil, nil, err
 	}
+
 	sets, err := w.ListIpSet()
 	if err != nil {
 		return nil, nil, nil, err
 	}
+
 	rgs, err := w.ListRuleGroups()
 	if err != nil {
 		return nil, nil, nil, err
 	}
+
 	return acls, sets, rgs, nil
 }
 
@@ -472,7 +521,7 @@ func (w *WAF) Init() error {
 	w.aclsInfo, w.setsInfos, w.ruleGroupsInfos, err = w.ListResources()
 
 	if err != nil {
-		return fmt.Errorf("failed to list resources: %s", err)
+		return fmt.Errorf("failed to list resources: %w", err)
 	}
 
 	w.Logger.Tracef("Found %d WebACLs", len(w.aclsInfo))
@@ -505,7 +554,7 @@ func (w *WAF) Init() error {
 	w.aclsInfo, w.setsInfos, w.ruleGroupsInfos, err = w.ListResources()
 
 	if err != nil {
-		return fmt.Errorf("failed to list resources: %s", err)
+		return fmt.Errorf("failed to list resources: %w", err)
 	}
 
 	err = w.CreateRuleGroup(w.config.RuleGroupName)
@@ -536,6 +585,7 @@ func (w *WAF) UpdateSetsContent(d Decisions) error {
 		if action == "fallback" {
 			action = strings.ToLower(w.config.FallbackAction)
 		}
+
 		for _, ip := range ips {
 			w.ipsetManager.AddIp(*ip, action)
 		}
@@ -545,6 +595,7 @@ func (w *WAF) UpdateSetsContent(d Decisions) error {
 		if action == "fallback" {
 			action = strings.ToLower(w.config.FallbackAction)
 		}
+
 		for _, ip := range ips {
 			w.ipsetManager.DeleteIp(*ip, action)
 		}
@@ -554,6 +605,7 @@ func (w *WAF) UpdateSetsContent(d Decisions) error {
 		if action == "fallback" {
 			action = strings.ToLower(w.config.FallbackAction)
 		}
+
 		for _, ip := range ips {
 			w.ipsetManager.AddIp(*ip, action)
 		}
@@ -563,10 +615,12 @@ func (w *WAF) UpdateSetsContent(d Decisions) error {
 		if action == "fallback" {
 			action = strings.ToLower(w.config.FallbackAction)
 		}
+
 		for _, ip := range ips {
 			w.ipsetManager.DeleteIp(*ip, action)
 		}
 	}
+
 	err = w.ipsetManager.Commit()
 	if err != nil {
 		return fmt.Errorf("failed to commit ipset changes: %w", err)
@@ -577,12 +631,13 @@ func (w *WAF) UpdateSetsContent(d Decisions) error {
 	if err != nil {
 		return fmt.Errorf("failed to update RuleGroup %s: %w", w.config.RuleGroupName, err)
 	}
+
 	w.ipsetManager.DeleteEmptySets()
+
 	return nil
 }
 
 func (w *WAF) UpdateGeoSet(d Decisions) error {
-
 	if len(d.CountriesAdd) == 0 && len(d.CountriesDel) == 0 {
 		return nil
 	}
@@ -611,11 +666,12 @@ func (w *WAF) UpdateGeoSet(d Decisions) error {
 	for _, action := range cfg.ValidActions {
 		decisions[action] = make([]*string, 0)
 		decisions[action] = append(decisions[action], d.CountriesAdd[action]...)
+
 		if w.config.FallbackAction == action && len(d.CountriesAdd["fallback"]) > 0 {
 			decisions[action] = append(decisions[action], d.CountriesAdd["fallback"]...)
 		}
 
-		//We don't currently have a rule for countries for this action
+		// We don't currently have a rule for countries for this action
 		if rules[action] == nil && len(decisions[action]) > 0 {
 			w.Logger.Infof("Creating rule %s for action %s", "crowdsec-rule-country-"+action, action)
 			rules[action] = &wafv2.Rule{
@@ -630,20 +686,25 @@ func (w *WAF) UpdateGeoSet(d Decisions) error {
 				Action:           w.getRuleAction(action),
 			}
 			rg.Rules = append(rg.Rules, rules[action])
-		} else if rules[action] != nil { //We have a rule for this action
+		} else if rules[action] != nil { // We have a rule for this action
 			w.Logger.Infof("Updating rule %s for action %s", *rules[action].Name, action)
 			decisions[action] = append(decisions[action], rules[action].Statement.GeoMatchStatement.CountryCodes...)
+
 			for _, c := range d.CountriesDel[action] {
 				decisions[action] = removesStringPtr(decisions[action], *c)
 			}
+
 			if len(d.CountriesDel["fallback"]) > 0 && w.config.FallbackAction == action {
 				for _, c := range d.CountriesDel["fallback"] {
 					decisions[action] = removesStringPtr(decisions[action], *c)
 				}
 			}
 		}
+
 		priority++
+
 		w.Logger.Debugf("Decisions for action %s: %+v", action, decisions[action])
+
 		if len(decisions[action]) == 0 && rules[action] != nil {
 			w.Logger.Infof("Removing rule %s for action %s", *rules[action].Name, action)
 			rg.Rules = removeRuleFromRuleGroup(rg.Rules, *rules[action].Name)
@@ -664,6 +725,7 @@ func (w *WAF) UpdateGeoSet(d Decisions) error {
 	if err != nil {
 		return fmt.Errorf("failed to update RuleGroup  %s for geoset update: %w", w.config.WebACLName, err)
 	}
+
 	w.Logger.Debug("Updated RuleGroup for geomatch")
 
 	return nil
@@ -679,13 +741,17 @@ func (w *WAF) Process() error {
 			return nil
 		case decisions := <-w.DecisionsChan:
 			var err error
+
 			w.lock.Lock()
+
 			w.aclsInfo, w.setsInfos, w.ruleGroupsInfos, err = w.ListResources()
 			if err != nil {
 				w.Logger.Errorf("Failed to list resources: %s", err)
 				w.lock.Unlock()
+
 				continue
 			}
+
 			err = w.UpdateSetsContent(decisions)
 			if err != nil {
 				w.Logger.Errorf("Failed to update IPSets: %s", err)
@@ -696,7 +762,6 @@ func (w *WAF) Process() error {
 				w.Logger.Errorf("Failed to update GeoSet: %s", err)
 			}
 			w.lock.Unlock()
-
 		}
 	}
 }
@@ -708,6 +773,7 @@ func (w *WAF) Dump() {
 
 func NewWaf(config cfg.AclConfig) (*WAF, error) {
 	var s *session.Session
+
 	if config.Scope == "CLOUDFRONT" {
 		config.Region = "us-east-1"
 	}
@@ -740,6 +806,7 @@ func NewWaf(config cfg.AclConfig) (*WAF, error) {
 			},
 		}))
 	}
+
 	client := wafv2.New(s)
 	w.client = client
 	w.config = &config
@@ -749,6 +816,7 @@ func NewWaf(config cfg.AclConfig) (*WAF, error) {
 	if w.config.CloudWatchMetricName != "" {
 		metricName = w.config.CloudWatchMetricName
 	}
+
 	w.visibilityConfig = &wafv2.VisibilityConfig{
 		SampledRequestsEnabled:   &w.config.SampleRequests,
 		CloudWatchMetricsEnabled: &w.config.CloudWatchEnabled,
@@ -756,5 +824,6 @@ func NewWaf(config cfg.AclConfig) (*WAF, error) {
 	}
 
 	w.T.Go(w.Process)
+
 	return w, nil
 }

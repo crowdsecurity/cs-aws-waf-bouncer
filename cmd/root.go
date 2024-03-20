@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -18,7 +19,6 @@ import (
 
 	"github.com/crowdsecurity/crowdsec/pkg/models"
 	csbouncer "github.com/crowdsecurity/go-cs-bouncer"
-
 	"github.com/crowdsecurity/go-cs-lib/version"
 
 	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/cfg"
@@ -30,8 +30,8 @@ var wafInstances = make([]*waf.WAF, 0)
 func resourceCleanup() {
 	for _, w := range wafInstances {
 		w.Logger.Infof("Cleaning up resources")
-		err := w.Cleanup()
-		if err != nil {
+
+		if err := w.Cleanup(); err != nil {
 			log.Errorf("Error cleaning up WAF: %s", err)
 		}
 	}
@@ -45,13 +45,14 @@ func HandleSignals(ctx context.Context) error {
 	case s := <-signalChan:
 		switch s {
 		case syscall.SIGTERM:
-			return fmt.Errorf("received SIGTERM")
+			return errors.New("received SIGTERM")
 		case os.Interrupt: // cross-platform SIGINT
-			return fmt.Errorf("received interrupt")
+			return errors.New("received interrupt")
 		}
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+
 	return nil
 }
 
@@ -70,6 +71,7 @@ func processDecisions(decisions *models.DecisionsStreamResponse, supportedAction
 		if !slices.Contains(supportedActions, decisionType) {
 			decisionType = "fallback"
 		}
+
 		if strings.ToLower(*decision.Scope) == "ip" || strings.ToLower(*decision.Scope) == "range" {
 			if strings.Contains(*decision.Value, ":") {
 				if !strings.Contains(*decision.Value, "/") {
@@ -96,6 +98,7 @@ func processDecisions(decisions *models.DecisionsStreamResponse, supportedAction
 		if !slices.Contains(supportedActions, decisionType) {
 			decisionType = "fallback"
 		}
+
 		if strings.ToLower(*decision.Scope) == "ip" || strings.ToLower(*decision.Scope) == "range" {
 			if strings.Contains(*decision.Value, ":") {
 				if !strings.Contains(*decision.Value, "/") {
@@ -136,6 +139,7 @@ func Execute() error {
 	}
 
 	configBytes := []byte{}
+
 	var err error
 
 	if configPath != nil && *configPath != "" {
@@ -169,12 +173,15 @@ func Execute() error {
 	if *testConfig {
 		for _, wafConfig := range config.WebACLConfig {
 			log.Debugf("Create WAF instance with config: %+v", wafConfig)
+
 			_, err := waf.NewWaf(wafConfig)
 			if err != nil {
 				return fmt.Errorf("configuration error: %w", err)
 			}
 		}
+
 		log.Info("valid config")
+
 		return nil
 	}
 
@@ -198,17 +205,21 @@ func Execute() error {
 
 	for _, wafConfig := range config.WebACLConfig {
 		log.Debugf("Create WAF instance with config: %+v", wafConfig)
+
 		w, err := waf.NewWaf(wafConfig)
 		if err != nil {
 			return fmt.Errorf("could not create waf instance: %w", err)
 		}
+
 		err = w.Init()
 		if err != nil {
 			if os.Getenv("CS_AWS_WAF_BOUNCER_TESTING") == "" {
 				return fmt.Errorf("could not initialize waf instance: %w", err)
 			}
+
 			log.Errorf("could not initialize waf instance: %v+", err)
 		}
+
 		wafInstances = append(wafInstances, w)
 	}
 
@@ -220,7 +231,7 @@ func Execute() error {
 
 	g.Go(func() error {
 		bouncer.Run(ctx)
-		return fmt.Errorf("bouncer stream halted")
+		return errors.New("bouncer stream halted")
 	})
 
 	if config.Daemon {
@@ -232,13 +243,16 @@ func Execute() error {
 
 	g.Go(func() error {
 		log.Info("Starting processing decisions")
+
 		for {
 			select {
 			case <-ctx.Done():
 				log.Info("terminating bouncer process")
+
 				for _, w := range wafInstances {
 					w.T.Kill(nil)
 				}
+
 				return nil
 			case decisions := <-bouncer.Stream:
 				log.Info("Polling decisions")

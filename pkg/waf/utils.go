@@ -10,6 +10,7 @@ func removesStringPtr(slice []*string, s string) []*string {
 			return append(slice[:i], slice[i+1:]...)
 		}
 	}
+
 	return slice
 }
 
@@ -19,6 +20,7 @@ func removesString(slice []string, s string) []string {
 			return append(slice[:i], slice[i+1:]...)
 		}
 	}
+
 	return slice
 }
 
@@ -28,6 +30,7 @@ func removeRuleFromRuleGroup(rules []*wafv2.Rule, name string) []*wafv2.Rule {
 			return append(rules[:i], rules[i+1:]...)
 		}
 	}
+
 	return rules
 }
 
@@ -37,6 +40,7 @@ func removeIpSetFromSlice(sets []*WAFIpSet, ipset *WAFIpSet) []*WAFIpSet {
 			return append(sets[:i], sets[i+1:]...)
 		}
 	}
+
 	return sets
 }
 
@@ -47,9 +51,11 @@ func uniqueStrPtr(s []*string) []*string {
 			m[v] = true
 		}
 	}
+
 	var result []*string
 	for k := range m {
 		result = append(result, k)
 	}
+
 	return result
 }
