@@ -5,9 +5,9 @@ go 1.21
 require (
 	github.com/aws/aws-sdk-go v1.48.15
 	github.com/coreos/go-systemd/v22 v22.5.0
-	github.com/crowdsecurity/crowdsec v1.6.0
+	github.com/crowdsecurity/crowdsec v1.6.1
 	github.com/crowdsecurity/go-cs-bouncer v0.0.13
-	github.com/crowdsecurity/go-cs-lib v0.0.8
+	github.com/crowdsecurity/go-cs-lib v0.0.11
 	github.com/google/uuid v1.3.0
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
@@ -48,9 +48,9 @@ require (
 	github.com/prometheus/common v0.45.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
 	go.mongodb.org/mongo-driver v1.12.1 // indirect
-	golang.org/x/net v0.19.0 // indirect
-	golang.org/x/sys v0.15.0 // indirect
+	golang.org/x/net v0.24.0 // indirect
+	golang.org/x/sys v0.19.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
