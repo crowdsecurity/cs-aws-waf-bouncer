@@ -8,4 +8,4 @@ fi
 
 echo "Running with args: $ARGS"
 
-/crowdsec-aws-waf-bouncer $ARGS
+exec /crowdsec-aws-waf-bouncer $ARGS
