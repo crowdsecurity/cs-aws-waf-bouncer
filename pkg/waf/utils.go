@@ -4,16 +4,6 @@ import (
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 )
 
-func removesStringPtr(slice []*string, s string) []*string {
-	for i, item := range slice {
-		if *item == s {
-			return append(slice[:i], slice[i+1:]...)
-		}
-	}
-
-	return slice
-}
-
 func removesString(slice []string, s string) []string {
 	for i, item := range slice {
 		if item == s {
@@ -44,15 +34,15 @@ func removeIpSetFromSlice(sets []*WAFIpSet, ipset *WAFIpSet) []*WAFIpSet {
 	return sets
 }
 
-func uniqueStrPtr(s []*string) []*string {
-	m := make(map[*string]bool)
+func uniqueSlice[S comparable](s []S) []S {
+	m := make(map[S]bool)
 	for _, v := range s {
 		if _, ok := m[v]; !ok {
 			m[v] = true
 		}
 	}
 
-	var result []*string
+	var result []S
 	for k := range m {
 		result = append(result, k)
 	}

@@ -628,7 +628,7 @@ func (w *WAF) UpdateGeoSet(d Decisions) error {
 				Name: aws.String("crowdsec-rule-country-" + action),
 				Statement: &wafv2types.Statement{
 					GeoMatchStatement: &wafv2types.GeoMatchStatement{
-						CountryCodes: decisions[action], // FIXME: make sure it's unique
+						CountryCodes: uniqueSlice(decisions[action]),
 					},
 				},
 				Priority:         int32(priority), //FIXME: get the priority dynamically, but it does not really matter as we managed the rulegroup ourselves
@@ -664,7 +664,7 @@ func (w *WAF) UpdateGeoSet(d Decisions) error {
 			rg.Rules = removeRuleFromRuleGroup(rg.Rules, *rules[action].Name)
 		} else if len(decisions[action]) > 0 {
 			w.Logger.Debugf("Updating rule %s for action %s with countries %v", *rules[action].Name, action, decisions[action])
-			rules[action].Statement.GeoMatchStatement.CountryCodes = decisions[action] // FIXME: make sure it's unique
+			rules[action].Statement.GeoMatchStatement.CountryCodes = uniqueSlice(decisions[action])
 		}
 	}
 
