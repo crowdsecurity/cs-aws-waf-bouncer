@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
+	"github.com/aws/smithy-go/logging"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/tomb.v2"
 
@@ -791,6 +792,17 @@ func NewWaf(cfg cfg.AclConfig) (*WAF, error) {
 		"acl":    cfg.WebACLName,
 	})
 
+	sdkLogger := logging.LoggerFunc(func(classification logging.Classification, format string, v ...interface{}) {
+		switch classification {
+		case logging.Debug:
+			logger.WithField("component", "aws-sdk").Debugf(format, v...)
+		case logging.Warn:
+			logger.WithField("component", "aws-sdk").Warnf(format, v...)
+		default:
+			logger.WithField("component", "aws-sdk").Infof(format, v...)
+		}
+	})
+
 	w := &WAF{
 		setsInfos:       make(map[string]IpSet),
 		aclsInfo:        make(map[string]Acl),
@@ -801,6 +813,11 @@ func NewWaf(cfg cfg.AclConfig) (*WAF, error) {
 
 	opts := []func(*config.LoadOptions) error{
 		config.WithRegion(cfg.Region),
+		config.WithRetryer(func() aws.Retryer {
+			return retry.AddWithErrorCodes(retry.NewStandard(), (*wafv2types.WAFUnavailableEntityException)(nil).ErrorCode())
+		}),
+		config.WithLogger(sdkLogger),
+		config.WithClientLogMode(aws.LogRetries),
 	}
 
 	if cfg.AWSProfile != "" {
