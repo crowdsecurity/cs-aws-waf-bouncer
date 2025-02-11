@@ -141,8 +141,8 @@ func (w *WAF) CreateRuleGroup(ruleGroupName string) error {
 			VisibilityConfig: w.visibilityConfig,
 		})
 		if err != nil {
-			switch err.(type) {
-			case *wafv2types.WAFUnavailableEntityException:
+			var unavailableEntity *wafv2types.WAFUnavailableEntityException
+			if errors.As(err, &unavailableEntity) {
 				if maxRetries == 0 {
 					return errors.New("WAF is not ready yet, giving up")
 				}
@@ -153,7 +153,7 @@ func (w *WAF) CreateRuleGroup(ruleGroupName string) error {
 				time.Sleep(2 * time.Second)
 
 				continue
-			default:
+			} else {
 				return err
 			}
 		}
@@ -182,7 +182,7 @@ func (w *WAF) UpdateRuleGroup() error {
 	token, rg, err := w.GetRuleGroup(w.config.RuleGroupName)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get rule group: %w", err)
 	}
 
 	for _, rule := range rg.Rules {
@@ -229,15 +229,15 @@ func (w *WAF) UpdateRuleGroup() error {
 			LockToken:        aws.String(token),
 		})
 		if err != nil {
-			switch err.(type) {
-			case *wafv2types.WAFUnavailableEntityException:
+			var unavailableEntity *wafv2types.WAFUnavailableEntityException
+			if errors.As(err, &unavailableEntity) {
 				log.Warnf("Dependencies of rule group %s not ready yet, retrying in 2 seconds", w.config.RuleGroupName)
 				time.Sleep(2 * time.Second)
 
 				maxRetries--
 
 				continue
-			default:
+			} else {
 				return err
 			}
 		}
@@ -385,8 +385,8 @@ func (w *WAF) AddRuleGroupToACL(acl *wafv2types.WebACL, token *string) error {
 			VisibilityConfig:     acl.VisibilityConfig,
 		})
 		if err != nil {
-			switch err.(type) {
-			case *wafv2types.WAFUnavailableEntityException:
+			var unavailableEntity *wafv2types.WAFUnavailableEntityException
+			if errors.As(err, &unavailableEntity) {
 				if maxRetries == 0 {
 					return fmt.Errorf("rule group %s is not ready, giving up", w.config.RuleGroupName)
 				}
@@ -397,7 +397,7 @@ func (w *WAF) AddRuleGroupToACL(acl *wafv2types.WebACL, token *string) error {
 				time.Sleep(2 * time.Second)
 
 				continue
-			default:
+			} else {
 				return err
 			}
 		}
@@ -565,6 +565,8 @@ func (w *WAF) Init() error {
 	if err != nil {
 		return fmt.Errorf("failed to create RuleGroup %s: %w", w.config.RuleGroupName, err)
 	}
+
+	w.Logger.Infof("RuleGroup %s created", w.config.RuleGroupName)
 
 	acl, lockTocken, err := w.GetWebACL(w.config.WebACLName, w.aclsInfo[w.config.WebACLName].Id)
 
