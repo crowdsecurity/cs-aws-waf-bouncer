@@ -11,7 +11,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/coreos/go-systemd/v22/daemon"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
@@ -23,6 +22,9 @@ import (
 
 	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/cfg"
 	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/waf"
+
+	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
+	"github.com/aws/aws-sdk-go/aws"
 )
 
 var wafInstances = make([]*waf.WAF, 0)
@@ -62,8 +64,8 @@ func processDecisions(decisions *models.DecisionsStreamResponse, supportedAction
 		V6Add:        make(map[string][]*string),
 		V4Del:        make(map[string][]*string),
 		V6Del:        make(map[string][]*string),
-		CountriesAdd: make(map[string][]*string),
-		CountriesDel: make(map[string][]*string),
+		CountriesAdd: make(map[string][]wafv2types.CountryCode),
+		CountriesDel: make(map[string][]wafv2types.CountryCode),
 	}
 
 	for _, decision := range decisions.New {
@@ -87,7 +89,7 @@ func processDecisions(decisions *models.DecisionsStreamResponse, supportedAction
 				}
 			}
 		} else if strings.ToLower(*decision.Scope) == "country" {
-			d.CountriesAdd[decisionType] = append(d.CountriesAdd[decisionType], decision.Value)
+			d.CountriesAdd[decisionType] = append(d.CountriesAdd[decisionType], wafv2types.CountryCode(*decision.Value))
 		} else {
 			log.Errorf("unsupported scope: %s", *decision.Scope)
 		}
@@ -114,7 +116,7 @@ func processDecisions(decisions *models.DecisionsStreamResponse, supportedAction
 				}
 			}
 		} else if strings.ToLower(*decision.Scope) == "country" {
-			d.CountriesDel[decisionType] = append(d.CountriesDel[decisionType], decision.Value)
+			d.CountriesDel[decisionType] = append(d.CountriesDel[decisionType], wafv2types.CountryCode(*decision.Value))
 		} else {
 			log.Errorf("unsupported scope: %s", *decision.Scope)
 		}

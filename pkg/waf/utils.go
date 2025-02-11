@@ -1,7 +1,7 @@
 package waf
 
 import (
-	"github.com/aws/aws-sdk-go/service/wafv2"
+	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 )
 
 func removesStringPtr(slice []*string, s string) []*string {
@@ -24,7 +24,7 @@ func removesString(slice []string, s string) []string {
 	return slice
 }
 
-func removeRuleFromRuleGroup(rules []*wafv2.Rule, name string) []*wafv2.Rule {
+func removeRuleFromRuleGroup(rules []wafv2types.Rule, name string) []wafv2types.Rule {
 	for i, r := range rules {
 		if *r.Name == name {
 			return append(rules[:i], rules[i+1:]...)

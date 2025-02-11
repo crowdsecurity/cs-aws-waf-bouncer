@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/service/wafv2"
+	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -12,7 +12,7 @@ type IPSetManager struct {
 	IPSets    []*WAFIpSet
 	setPrefix string
 	scope     string
-	client    *wafv2.WAFV2
+	client    *wafv2.Client
 	logger    *log.Entry
 }
 
@@ -120,7 +120,7 @@ func (im *IPSetManager) DeleteSets() {
 	}
 }
 
-func NewIPSetManager(setPrefix string, scope string, client *wafv2.WAFV2, logger *log.Entry) *IPSetManager {
+func NewIPSetManager(setPrefix string, scope string, client *wafv2.Client, logger *log.Entry) *IPSetManager {
 	l := logger.WithField("component", "ipset_manager")
 
 	return &IPSetManager{
