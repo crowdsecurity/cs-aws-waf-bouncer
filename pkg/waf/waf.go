@@ -2,14 +2,13 @@ package waf
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
@@ -123,48 +122,28 @@ func (w *WAF) ListRuleGroups() (map[string]RuleGroup, error) {
 }
 
 func (w *WAF) CreateRuleGroup(ruleGroupName string) error {
-	maxRetries := 5
+	w.Logger.Trace("before create rule group")
 
-	for {
-		w.Logger.Trace("before create rule group")
-
-		r, err := w.client.CreateRuleGroup(context.TODO(), &wafv2.CreateRuleGroupInput{
-			Name:  aws.String(ruleGroupName),
-			Rules: nil,
-			Tags: []wafv2types.Tag{
-				{
-					Key:   aws.String("CrowdsecManaged"),
-					Value: aws.String("true"),
-				},
+	r, err := w.client.CreateRuleGroup(context.TODO(), &wafv2.CreateRuleGroupInput{
+		Name:  aws.String(ruleGroupName),
+		Rules: nil,
+		Tags: []wafv2types.Tag{
+			{
+				Key:   aws.String("CrowdsecManaged"),
+				Value: aws.String("true"),
 			},
-			Scope:            wafv2types.Scope(w.config.Scope),
-			Capacity:         aws.Int64(int64(w.config.Capacity)), //FIXME: Automatically set capacity if not provided by the user
-			VisibilityConfig: w.visibilityConfig,
-		})
-		if err != nil {
-			var unavailableEntity *wafv2types.WAFUnavailableEntityException
-			if errors.As(err, &unavailableEntity) {
-				if maxRetries == 0 {
-					return errors.New("WAF is not ready yet, giving up")
-				}
+		},
+		Scope:            wafv2types.Scope(w.config.Scope),
+		Capacity:         aws.Int64(int64(w.config.Capacity)), //FIXME: Automatically set capacity if not provided by the user
+		VisibilityConfig: w.visibilityConfig,
+	})
+	if err != nil {
+		return err
+	}
 
-				maxRetries -= 1
-
-				log.Warnf("Dependencies of rule group %s not ready yet, retrying in 2 seconds", w.config.RuleGroupName)
-				time.Sleep(2 * time.Second)
-
-				continue
-			} else {
-				return err
-			}
-		}
-
-		w.ruleGroupsInfos[ruleGroupName] = RuleGroup{
-			ARN: *r.Summary.ARN,
-			Id:  *r.Summary.Id,
-		}
-
-		break
+	w.ruleGroupsInfos[ruleGroupName] = RuleGroup{
+		ARN: *r.Summary.ARN,
+		Id:  *r.Summary.Id,
 	}
 
 	return nil
@@ -173,7 +152,6 @@ func (w *WAF) CreateRuleGroup(ruleGroupName string) error {
 func (w *WAF) UpdateRuleGroup() error {
 	rules := make([]wafv2types.Rule, 0)
 	priority := 0
-	maxRetries := 5
 
 	if len(w.ipsetManager.IPSets) == 0 {
 		w.Logger.Debugf("No IPSets to add to rule group %s", w.config.RuleGroupName)
@@ -216,35 +194,19 @@ func (w *WAF) UpdateRuleGroup() error {
 		w.Logger.Infof("Removing all rules from group %s", w.config.RuleGroupName)
 	}
 
-	for {
-		if maxRetries <= 0 {
-			return errors.New("WAF is not ready yet, giving up")
-		}
-
-		_, err = w.client.UpdateRuleGroup(context.TODO(), &wafv2.UpdateRuleGroupInput{
-			Name:             aws.String(w.config.RuleGroupName),
-			Rules:            rules,
-			Scope:            wafv2types.Scope(w.config.Scope),
-			VisibilityConfig: rg.VisibilityConfig,
-			Id:               aws.String(w.ruleGroupsInfos[w.config.RuleGroupName].Id),
-			LockToken:        aws.String(token),
-		})
-		if err != nil {
-			var unavailableEntity *wafv2types.WAFUnavailableEntityException
-			if errors.As(err, &unavailableEntity) {
-				log.Warnf("Dependencies of rule group %s not ready yet, retrying in 2 seconds", w.config.RuleGroupName)
-				time.Sleep(2 * time.Second)
-
-				maxRetries--
-
-				continue
-			} else {
-				return err
-			}
-		}
-
-		return nil
+	_, err = w.client.UpdateRuleGroup(context.TODO(), &wafv2.UpdateRuleGroupInput{
+		Name:             aws.String(w.config.RuleGroupName),
+		Rules:            rules,
+		Scope:            wafv2types.Scope(w.config.Scope),
+		VisibilityConfig: rg.VisibilityConfig,
+		Id:               aws.String(w.ruleGroupsInfos[w.config.RuleGroupName].Id),
+		LockToken:        aws.String(token),
+	})
+	if err != nil {
+		return err
 	}
+
+	return nil
 }
 
 func (w *WAF) DeleteRuleGroup(ruleGroupName string, token string, id string) error {
@@ -348,7 +310,6 @@ func (w *WAF) getPriority(acl *wafv2types.WebACL) int32 {
 func (w *WAF) AddRuleGroupToACL(acl *wafv2types.WebACL, token *string) error {
 	var newRules []wafv2types.Rule
 	newRules = append(newRules, acl.Rules...)
-	maxRetries := 5
 
 	w.Logger.Infof("Adding RuleGroup %s to ACL %s", w.config.RuleGroupName, *acl.Name)
 
@@ -372,39 +333,22 @@ func (w *WAF) AddRuleGroupToACL(acl *wafv2types.WebACL, token *string) error {
 
 	newRules = append(newRules, rule)
 
-	for {
-		_, err := w.client.UpdateWebACL(context.TODO(), &wafv2.UpdateWebACLInput{
-			CaptchaConfig:        acl.CaptchaConfig,
-			CustomResponseBodies: acl.CustomResponseBodies,
-			DefaultAction:        acl.DefaultAction,
-			Description:          nil,
-			Id:                   acl.Id,
-			LockToken:            token,
-			Name:                 acl.Name,
-			Rules:                newRules,
-			Scope:                wafv2types.Scope(w.config.Scope),
-			VisibilityConfig:     acl.VisibilityConfig,
-		})
-		if err != nil {
-			var unavailableEntity *wafv2types.WAFUnavailableEntityException
-			if errors.As(err, &unavailableEntity) {
-				if maxRetries == 0 {
-					return fmt.Errorf("rule group %s is not ready, giving up", w.config.RuleGroupName)
-				}
-
-				maxRetries -= 1
-
-				log.Warnf("rule group %s is not ready yet, retrying in 2 seconds", w.config.RuleGroupName)
-				time.Sleep(2 * time.Second)
-
-				continue
-			} else {
-				return err
-			}
-		}
-
-		break
+	_, err := w.client.UpdateWebACL(context.TODO(), &wafv2.UpdateWebACLInput{
+		CaptchaConfig:        acl.CaptchaConfig,
+		CustomResponseBodies: acl.CustomResponseBodies,
+		DefaultAction:        acl.DefaultAction,
+		Description:          nil,
+		Id:                   acl.Id,
+		LockToken:            token,
+		Name:                 acl.Name,
+		Rules:                newRules,
+		Scope:                wafv2types.Scope(w.config.Scope),
+		VisibilityConfig:     acl.VisibilityConfig,
+	})
+	if err != nil {
+		return err
 	}
+
 	w.Logger.Debugf("RuleGroup %s added to ACL %s", w.config.RuleGroupName, *acl.Name)
 
 	return nil
