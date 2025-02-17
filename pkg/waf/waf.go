@@ -755,13 +755,19 @@ func NewWaf(cfg cfg.AclConfig) (*WAF, error) {
 		DecisionsChan:   make(chan Decisions),
 	}
 
+	logMode := aws.LogRetries
+
+	if logger.Logger.IsLevelEnabled(log.TraceLevel) {
+		logMode = aws.LogRequestWithBody
+	}
+
 	opts := []func(*config.LoadOptions) error{
 		config.WithRegion(cfg.Region),
 		config.WithRetryer(func() aws.Retryer {
 			return retry.AddWithErrorCodes(retry.NewStandard(), (*wafv2types.WAFUnavailableEntityException)(nil).ErrorCode())
 		}),
 		config.WithLogger(sdkLogger),
-		config.WithClientLogMode(aws.LogRetries),
+		config.WithClientLogMode(logMode),
 	}
 
 	if cfg.AWSProfile != "" {
