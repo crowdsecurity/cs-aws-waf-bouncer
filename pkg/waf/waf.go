@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 	"github.com/aws/smithy-go/logging"
+	"github.com/davecgh/go-spew/spew"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/tomb.v2"
 
@@ -166,6 +167,7 @@ func (w *WAF) UpdateRuleGroup() error {
 
 	for _, rule := range rg.Rules {
 		if *rule.Name != "crowdsec-rule-ban" && *rule.Name != "crowdsec-rule-captcha" && *rule.Name != "crowdsec-rule-count" {
+			spew.Dump(rule)
 			rules = append(rules, rule)
 		}
 	}
@@ -333,11 +335,19 @@ func (w *WAF) AddRuleGroupToACL(acl *wafv2types.WebACL, token *string) error {
 
 	newRules = append(newRules, rule)
 
+	var description *string = nil
+	if acl.Description != nil && *acl.Description != "" {
+		description = acl.Description
+	}
+
 	_, err := w.client.UpdateWebACL(context.TODO(), &wafv2.UpdateWebACLInput{
+		AssociationConfig:    acl.AssociationConfig,
+		ChallengeConfig:      acl.ChallengeConfig,
+		TokenDomains:         acl.TokenDomains,
 		CaptchaConfig:        acl.CaptchaConfig,
 		CustomResponseBodies: acl.CustomResponseBodies,
 		DefaultAction:        acl.DefaultAction,
-		Description:          nil,
+		Description:          description,
 		Id:                   acl.Id,
 		LockToken:            token,
 		Name:                 acl.Name,
@@ -361,15 +371,26 @@ func (w *WAF) RemoveRuleGroupFromACL(acl *wafv2types.WebACL, token *string) erro
 
 	for _, rule := range acl.Rules {
 		if *rule.Name != w.config.RuleGroupName {
+			spew.Dump(rule)
 			newRules = append(newRules, rule)
 		}
 	}
 
+	spew.Dump(acl)
+
+	var description *string = nil
+	if acl.Description != nil && *acl.Description != "" {
+		description = acl.Description
+	}
+
 	_, err := w.client.UpdateWebACL(context.TODO(), &wafv2.UpdateWebACLInput{
+		AssociationConfig:    acl.AssociationConfig,
+		ChallengeConfig:      acl.ChallengeConfig,
+		TokenDomains:         acl.TokenDomains,
 		CaptchaConfig:        acl.CaptchaConfig,
 		CustomResponseBodies: acl.CustomResponseBodies,
 		DefaultAction:        acl.DefaultAction,
-		Description:          nil,
+		Description:          description,
 		Id:                   acl.Id,
 		LockToken:            token,
 		Name:                 acl.Name,
