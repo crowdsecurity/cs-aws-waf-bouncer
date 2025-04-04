@@ -1,73 +1,131 @@
-# https://github.com/golangci/golangci-lint/blob/master/.golangci.reference.yml
-
-linters-settings:
-  gci:
-    sections:
-     - standard
-     - default
-     - prefix(github.com/crowdsecurity)
-     - prefix(github.com/crowdsecurity/cs-aws-waf-bouncer)
-
-  misspell:
-    locale: US
-
-  nolintlint:
-    allow-unused: false # report any unused nolint directives
-    require-explanation: false # don't require an explanation for nolint directives
-    require-specific: false # don't require nolint directives to be specific about which linter is being skipped
-
-  wsl:
-    # Allow blocks to end with comments
-    allow-trailing-comment: true
-
+version: "2"
 linters:
-  enable-all: true
+  default: all
   disable:
-    #
-    # DEPRECATED by golangi-lint
-    #
-    - mnd
-    - wsl
-    - exptostd
-    - depguard            # Go linter that checks if package imports are in a list of acceptable packages
-    - dogsled               # Checks assignments with too many blank identifiers (e.g. x, _, _, _, := f())
-    - godot                 # Check if comments end in a period
-    - gofmt                 # Gofmt checks whether code was gofmt-ed. By default this tool runs with -s option to check for code simplification
-    - goimports             # In addition to fixing imports, goimports also formats your code in the same style as gofmt.
-    - gosec                 # (gas): Inspects source code for security problems
-    - inamedparam           # reports interfaces with unnamed method parameters
-    - lll                   # Reports long lines
-    - musttag               # enforce field tags in (un)marshaled structs
-    - wrapcheck             # Checks that errors returned from external packages are wrapped
-    - nilnil                # Checks that there is no simultaneous return of `nil` error and an invalid value.
-    - gofumpt               # Gofumpt checks whether code was gofumpt-ed.
-    - nlreturn              # nlreturn checks for a new line before return and branch statements to increase code clarity
-    - perfsprint
-    - errorlint
     - cyclop
-    - revive
-    - stylecheck
-    - nestif
-    - gocritic
+    - depguard
+    - dupl
+    - err113
+    - errorlint
+    - exhaustruct
+    - exptostd
+    - forbidigo
     - funlen
-    - gocognit
     - gocyclo
-    - dupl                  # Tool for code clone detection
-    - forcetypeassert       # finds forced type assertions
-    - godox                 # Tool for detection of FIXME, TODO and other comment keywords
-    - err113                # Golang linter to check the errors handling expressions
-    - paralleltest          # paralleltest detects missing usage of t.Parallel() method in your Go test
-    - testpackage           # linter that makes you use a separate _test package
-    - exhaustruct           # Checks if all structure fields are initialized
-    - forbidigo             # Forbids identifiers
-    - gochecknoglobals      # check that no global variables exist
-    - goconst               # Finds repeated strings that could be replaced by a constant
-    - tagliatelle           # Checks the struct tags.
-    - varnamelen            # checks that the length of a variable's name matches its scope
-    - prealloc              # Finds slice declarations that could potentially be preallocated
-    - tenv
+    - gochecknoglobals
+    - gocognit
+    - goconst
+    - godox
+    - lll
+    - mnd
+    - nestif
+    - nlreturn
+    - perfsprint
+    - prealloc
+    - tagliatelle
+    - testpackage
+    - varnamelen
+    - wrapcheck
+    - wsl
+  settings:
 
+    errcheck:
+      check-type-assertions: false
 
+    gocritic:
+      enable-all: true
+      disabled-checks:
+        - assignOp
+        - equalFold
+        - hugeParam
+        - ifElseChain
+        - nestingReduce
+        - paramTypeCombine
+        - rangeValCopy
+        - unnamedResult
+        - whyNoLint
+
+    misspell:
+      locale: US
+    nolintlint:
+      require-explanation: false
+      require-specific: false
+      allow-unused: false
+
+    revive:
+      severity: error
+      enable-all-rules: true
+      rules:
+        - name: add-constant
+          disabled: true
+        - name: cognitive-complexity
+          arguments:
+            # lower this after refactoring
+            - 62
+        - name: cyclomatic
+          arguments:
+            # lower this after refactoring
+            - 46
+        - name: comment-spacings
+          disabled: true
+        - name: function-length
+          arguments:
+            # lower this after refactoring
+            - 75
+            - 146
+        - name: function-result-limit
+          disabled: true
+        - name: increment-decrement
+          disabled: true
+        - name: get-return
+          disabled: true
+        - name: line-length-limit
+          arguments:
+            # lower this after refactoring
+            - 168
+        - name: exported
+          disabled: true
+        - name: unexported-return
+          disabled: true
+        - name: var-naming
+          disabled: true
+        - name: unused-receiver
+          disabled: true
+        - name: use-errors-new
+          disabled: true
+
+    wsl:
+      allow-trailing-comment: true
+  exclusions:
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - govet
+        text: 'shadow: declaration of "err" shadows declaration'
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
+formatters:
+  enable:
+    - gci
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/crowdsecurity)
+        - prefix(github.com/crowdsecurity/crowdsec)
+        - prefix(github.com/crowdsecurity/cs-aws-waf-bouncer)
+  exclusions:
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
