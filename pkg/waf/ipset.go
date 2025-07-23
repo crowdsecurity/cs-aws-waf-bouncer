@@ -102,14 +102,14 @@ func (w *WAFIpSet) ToStatement(ipHeader string, ipHeaderPosition string) *wafv2t
 	}
 }
 
-func (w *WAFIpSet) getIPSet() (*wafv2types.IPSet, *string, error) {
+func (w *WAFIpSet) getIPSet(ctx context.Context) (*wafv2types.IPSet, *string, error) {
 	w.logger.Debugf("Getting IPSet %s", w.name)
 
 	if w.id == "" {
 		return nil, nil, &wafv2types.WAFNonexistentItemException{}
 	}
 
-	r, err := w.client.GetIPSet(context.TODO(), &wafv2.GetIPSetInput{
+	r, err := w.client.GetIPSet(ctx, &wafv2.GetIPSetInput{
 		Name:  aws.String(w.name),
 		Scope: wafv2types.Scope(w.scope),
 		Id:    aws.String(w.id),
@@ -121,11 +121,11 @@ func (w *WAFIpSet) getIPSet() (*wafv2types.IPSet, *string, error) {
 	return r.IPSet, r.LockToken, nil
 }
 
-func (w *WAFIpSet) createIpSet() (*wafv2types.IPSetSummary, error) {
+func (w *WAFIpSet) createIpSet(ctx context.Context) (*wafv2types.IPSetSummary, error) {
 	w.logger.Infof("Creating IPSet %s", w.name)
 	w.logger.Tracef("Set name: %s | Type: %s | Decision: %s | Scope: %s | %d IPS", w.name, w.ipType, w.decisionType, w.scope, w.Size())
 
-	r, err := w.client.CreateIPSet(context.TODO(), &wafv2.CreateIPSetInput{
+	r, err := w.client.CreateIPSet(ctx, &wafv2.CreateIPSetInput{
 		Name:             aws.String(w.name),
 		Addresses:        w.ips,
 		Scope:            wafv2types.Scope(w.scope),
@@ -138,15 +138,15 @@ func (w *WAFIpSet) createIpSet() (*wafv2types.IPSetSummary, error) {
 	return r.Summary, nil
 }
 
-func (w *WAFIpSet) DeleteIpSet() error {
+func (w *WAFIpSet) DeleteIpSet(ctx context.Context) error {
 	w.logger.Infof("Deleting IPSet %s", w.name)
 
-	_, token, err := w.getIPSet()
+	_, token, err := w.getIPSet(ctx)
 	if err != nil {
 		return err
 	}
 
-	_, err = w.client.DeleteIPSet(context.TODO(), &wafv2.DeleteIPSetInput{
+	_, err = w.client.DeleteIPSet(ctx, &wafv2.DeleteIPSetInput{
 		Name:      aws.String(w.name),
 		Scope:     wafv2types.Scope(w.scope),
 		Id:        aws.String(w.id),
@@ -159,10 +159,10 @@ func (w *WAFIpSet) DeleteIpSet() error {
 	return nil
 }
 
-func (w *WAFIpSet) Commit() error {
+func (w *WAFIpSet) Commit(ctx context.Context) error {
 	w.logger.Infof("Updating IPSet %s", w.name)
 
-	currSet, token, err := w.getIPSet()
+	currSet, token, err := w.getIPSet(ctx)
 	if err != nil {
 		switch err.(type) {
 		case *wafv2types.WAFNonexistentItemException:
@@ -172,7 +172,7 @@ func (w *WAFIpSet) Commit() error {
 	}
 
 	if currSet == nil {
-		summary, err := w.createIpSet()
+		summary, err := w.createIpSet(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to create IPSet %s: %w", w.name, err)
 		}
@@ -180,7 +180,7 @@ func (w *WAFIpSet) Commit() error {
 		w.arn = *summary.ARN
 		w.id = *summary.Id
 	} else {
-		_, err = w.client.UpdateIPSet(context.TODO(), &wafv2.UpdateIPSetInput{
+		_, err = w.client.UpdateIPSet(ctx, &wafv2.UpdateIPSetInput{
 			Name:      currSet.Name,
 			Addresses: w.ips,
 			Scope:     wafv2types.Scope(w.scope),

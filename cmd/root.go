@@ -33,7 +33,8 @@ func resourceCleanup() {
 	for _, w := range wafInstances {
 		w.Logger.Infof("Cleaning up resources")
 
-		if err := w.Cleanup(); err != nil {
+		// We are shutting down, cannot reuse the existing context as it may be cancelled
+		if err := w.Cleanup(context.Background()); err != nil {
 			log.Errorf("Error cleaning up WAF: %s", err)
 		}
 	}
@@ -172,11 +173,13 @@ func Execute() error {
 
 	log.Infof("Starting crowdsec-aws-waf-bouncer %s", version.String())
 
+	g, ctx := errgroup.WithContext(context.Background())
+
 	if *testConfig {
 		for _, wafConfig := range config.WebACLConfig {
 			log.Debugf("Create WAF instance with config: %+v", wafConfig)
 
-			_, err := waf.NewWaf(wafConfig)
+			_, err := waf.NewWaf(ctx, wafConfig)
 			if err != nil {
 				return fmt.Errorf("configuration error: %w", err)
 			}
@@ -208,12 +211,12 @@ func Execute() error {
 	for _, wafConfig := range config.WebACLConfig {
 		log.Debugf("Create WAF instance with config: %+v", wafConfig)
 
-		w, err := waf.NewWaf(wafConfig)
+		w, err := waf.NewWaf(ctx, wafConfig)
 		if err != nil {
 			return fmt.Errorf("could not create waf instance: %w", err)
 		}
 
-		err = w.Init()
+		err = w.Init(ctx)
 		if err != nil {
 			if os.Getenv("CS_AWS_WAF_BOUNCER_TESTING") == "" {
 				return fmt.Errorf("could not initialize waf instance: %w", err)
@@ -224,8 +227,6 @@ func Execute() error {
 
 		wafInstances = append(wafInstances, w)
 	}
-
-	g, ctx := errgroup.WithContext(context.Background())
 
 	g.Go(func() error {
 		return HandleSignals(ctx)

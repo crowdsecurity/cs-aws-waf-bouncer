@@ -1,6 +1,7 @@
 package waf
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -36,14 +37,14 @@ func (im *IPSetManager) alreadyInSets(ip string, decisionType string) bool {
 	return false
 }
 
-func (im *IPSetManager) Commit() error {
+func (im *IPSetManager) Commit(ctx context.Context) error {
 	for _, ipset := range im.IPSets {
 		im.logger.Debugf("checking if set %s is stale", ipset.GetName())
 
 		if ipset.IsStale() {
 			im.logger.Infof("set %s is stale, updating it", ipset.GetName())
 
-			err := ipset.Commit()
+			err := ipset.Commit(ctx)
 			if err != nil {
 				return err
 			}
@@ -88,7 +89,7 @@ func (im *IPSetManager) DeleteIp(ip string, decisionType string) {
 	}
 }
 
-func (im *IPSetManager) DeleteEmptySets() {
+func (im *IPSetManager) DeleteEmptySets(ctx context.Context) {
 	removed := make([]*WAFIpSet, 0)
 
 	for _, ipset := range im.IPSets {
@@ -100,7 +101,7 @@ func (im *IPSetManager) DeleteEmptySets() {
 	for _, ipset := range removed {
 		im.logger.Infof("set %s is empty, deleting it.", ipset.GetName())
 
-		err := ipset.DeleteIpSet()
+		err := ipset.DeleteIpSet(ctx)
 		if err != nil {
 			im.logger.Errorf("could not delete set %s: %s", ipset.GetName(), err)
 		}
@@ -109,11 +110,11 @@ func (im *IPSetManager) DeleteEmptySets() {
 	}
 }
 
-func (im *IPSetManager) DeleteSets() {
+func (im *IPSetManager) DeleteSets(ctx context.Context) {
 	for _, ipset := range im.IPSets {
 		im.logger.Infof("deleting set %s", ipset.GetName())
 
-		err := ipset.DeleteIpSet()
+		err := ipset.DeleteIpSet(ctx)
 		if err != nil {
 			im.logger.Errorf("could not delete set %s: %s", ipset.GetName(), err)
 		}
