@@ -233,8 +233,7 @@ func Execute() error {
 	})
 
 	g.Go(func() error {
-		bouncer.Run(ctx)
-		return errors.New("bouncer stream halted")
+		return bouncer.Run(ctx)
 	})
 
 	if config.Daemon {

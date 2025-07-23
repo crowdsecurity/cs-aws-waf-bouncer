@@ -151,7 +151,7 @@ func (w *WAF) CreateRuleGroup(ruleGroupName string) error {
 
 func (w *WAF) UpdateRuleGroup() error {
 	rules := make([]wafv2types.Rule, 0)
-	priority := 0
+	var priority int32 = 0
 
 	if len(w.ipsetManager.IPSets) == 0 {
 		w.Logger.Debugf("No IPSets to add to rule group %s", w.config.RuleGroupName)
@@ -177,7 +177,7 @@ func (w *WAF) UpdateRuleGroup() error {
 				Name:      aws.String(fmt.Sprintf("crowdsec-rule-%s", actionType)),
 				Action:    w.getRuleAction(actionType),
 				Statement: statement,
-				Priority:  int32(priority),
+				Priority:  priority,
 				VisibilityConfig: &wafv2types.VisibilityConfig{
 					SampledRequestsEnabled:   false,
 					CloudWatchMetricsEnabled: false,
@@ -333,7 +333,7 @@ func (w *WAF) AddRuleGroupToACL(acl *wafv2types.WebACL, token *string) error {
 
 	newRules = append(newRules, rule)
 
-	var description *string = nil
+	var description *string
 	if acl.Description != nil && *acl.Description != "" {
 		description = acl.Description
 	}
@@ -373,7 +373,7 @@ func (w *WAF) RemoveRuleGroupFromACL(acl *wafv2types.WebACL, token *string) erro
 		}
 	}
 
-	var description *string = nil
+	var description *string
 	if acl.Description != nil && *acl.Description != "" {
 		description = acl.Description
 	}
@@ -611,7 +611,7 @@ func (w *WAF) UpdateGeoSet(d Decisions) error {
 	rules := make(map[string]wafv2types.Rule)
 	decisions := make(map[string][]wafv2types.CountryCode)
 
-	priority := 50
+	var priority int32 = 50
 
 	token, rg, err := w.GetRuleGroup(w.config.RuleGroupName)
 	if err != nil {
@@ -647,7 +647,7 @@ func (w *WAF) UpdateGeoSet(d Decisions) error {
 						CountryCodes: uniqueSlice(decisions[action]),
 					},
 				},
-				Priority:         int32(priority), //FIXME: get the priority dynamically, but it does not really matter as we managed the rulegroup ourselves
+				Priority:         priority, //FIXME: get the priority dynamically, but it does not really matter as we managed the rulegroup ourselves
 				VisibilityConfig: rg.VisibilityConfig,
 				Action:           w.getRuleAction(action),
 			}
@@ -741,18 +741,18 @@ func (w *WAF) Dump() {
 	w.Logger.Debugf("WAF sets: %+v", w.setsInfos)
 }
 
-func NewWaf(cfg cfg.AclConfig) (*WAF, error) {
-	if cfg.Scope == "CLOUDFRONT" {
-		cfg.Region = "us-east-1"
+func NewWaf(bouncerConfig cfg.AclConfig) (*WAF, error) {
+	if bouncerConfig.Scope == "CLOUDFRONT" {
+		bouncerConfig.Region = "us-east-1"
 	}
 
 	logger := log.WithFields(log.Fields{
-		"region": cfg.Region,
-		"scope":  cfg.Scope,
-		"acl":    cfg.WebACLName,
+		"region": bouncerConfig.Region,
+		"scope":  bouncerConfig.Scope,
+		"acl":    bouncerConfig.WebACLName,
 	})
 
-	sdkLogger := logging.LoggerFunc(func(classification logging.Classification, format string, v ...interface{}) {
+	sdkLogger := logging.LoggerFunc(func(classification logging.Classification, format string, v ...any) {
 		switch classification {
 		case logging.Debug:
 			logger.WithField("component", "aws-sdk").Debugf(format, v...)
@@ -778,7 +778,7 @@ func NewWaf(cfg cfg.AclConfig) (*WAF, error) {
 	}
 
 	opts := []func(*config.LoadOptions) error{
-		config.WithRegion(cfg.Region),
+		config.WithRegion(bouncerConfig.Region),
 		config.WithRetryer(func() aws.Retryer {
 			return retry.AddWithErrorCodes(retry.NewStandard(), (*wafv2types.WAFUnavailableEntityException)(nil).ErrorCode())
 		}),
@@ -786,8 +786,8 @@ func NewWaf(cfg cfg.AclConfig) (*WAF, error) {
 		config.WithClientLogMode(logMode),
 	}
 
-	if cfg.AWSProfile != "" {
-		opts = append(opts, config.WithSharedConfigProfile(cfg.AWSProfile))
+	if bouncerConfig.AWSProfile != "" {
+		opts = append(opts, config.WithSharedConfigProfile(bouncerConfig.AWSProfile))
 	}
 
 	awsCfg, err := config.LoadDefaultConfig(context.TODO(),
@@ -800,7 +800,7 @@ func NewWaf(cfg cfg.AclConfig) (*WAF, error) {
 
 	client := wafv2.NewFromConfig(awsCfg)
 	w.client = client
-	w.config = &cfg
+	w.config = &bouncerConfig
 	w.T = &tomb.Tomb{}
 
 	metricName := w.config.RuleGroupName
