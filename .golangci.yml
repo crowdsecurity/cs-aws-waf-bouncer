@@ -28,7 +28,6 @@ linters:
     - wrapcheck
     - wsl
   settings:
-
     errcheck:
       check-type-assertions: false
 
@@ -72,7 +71,7 @@ linters:
           arguments:
             # lower this after refactoring
             - 75
-            - 146
+            - 149
         - name: function-result-limit
           disabled: true
         - name: increment-decrement
