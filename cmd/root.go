@@ -257,6 +257,10 @@ func Execute() error {
 				return nil
 			case decisions := <-bouncer.Stream:
 				log.Info("Polling decisions")
+				if decisions == nil {
+					log.Warning("received nil decisions")
+					continue
+				}
 
 				d := processDecisions(decisions, config.SupportedActions)
 				for _, w := range wafInstances {
