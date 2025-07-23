@@ -29,6 +29,8 @@ import (
 
 var wafInstances = make([]*waf.WAF, 0)
 
+var errSignalShutdown = errors.New("signal shutdown")
+
 func resourceCleanup() {
 	for _, w := range wafInstances {
 		w.Logger.Infof("Cleaning up resources")
@@ -48,9 +50,9 @@ func HandleSignals(ctx context.Context) error {
 	case s := <-signalChan:
 		switch s {
 		case syscall.SIGTERM:
-			return errors.New("received SIGTERM")
+			return errSignalShutdown
 		case os.Interrupt: // cross-platform SIGINT
-			return errors.New("received interrupt")
+			return errSignalShutdown
 		}
 	case <-ctx.Done():
 		return ctx.Err()
@@ -272,6 +274,10 @@ func Execute() error {
 	})
 
 	if err := g.Wait(); err != nil {
+		if errors.Is(err, errSignalShutdown) {
+			log.Info("Received shutdown signal, exiting gracefully")
+			return nil
+		}
 		return fmt.Errorf("process terminated with error: %w", err)
 	}
 
