@@ -1,0 +1,131 @@
+version: "2"
+linters:
+  default: all
+  disable:
+    - cyclop
+    - depguard
+    - dupl
+    - err113
+    - errorlint
+    - exhaustruct
+    - exptostd
+    - forbidigo
+    - funlen
+    - gocyclo
+    - gochecknoglobals
+    - gocognit
+    - goconst
+    - godox
+    - lll
+    - mnd
+    - nestif
+    - nlreturn
+    - perfsprint
+    - prealloc
+    - tagliatelle
+    - testpackage
+    - varnamelen
+    - wrapcheck
+    - wsl
+  settings:
+
+    errcheck:
+      check-type-assertions: false
+
+    gocritic:
+      enable-all: true
+      disabled-checks:
+        - assignOp
+        - equalFold
+        - hugeParam
+        - ifElseChain
+        - nestingReduce
+        - paramTypeCombine
+        - rangeValCopy
+        - unnamedResult
+        - whyNoLint
+
+    misspell:
+      locale: US
+    nolintlint:
+      require-explanation: false
+      require-specific: false
+      allow-unused: false
+
+    revive:
+      severity: error
+      enable-all-rules: true
+      rules:
+        - name: add-constant
+          disabled: true
+        - name: cognitive-complexity
+          arguments:
+            # lower this after refactoring
+            - 62
+        - name: cyclomatic
+          arguments:
+            # lower this after refactoring
+            - 46
+        - name: comment-spacings
+          disabled: true
+        - name: function-length
+          arguments:
+            # lower this after refactoring
+            - 75
+            - 146
+        - name: function-result-limit
+          disabled: true
+        - name: increment-decrement
+          disabled: true
+        - name: get-return
+          disabled: true
+        - name: line-length-limit
+          arguments:
+            # lower this after refactoring
+            - 168
+        - name: exported
+          disabled: true
+        - name: unexported-return
+          disabled: true
+        - name: var-naming
+          disabled: true
+        - name: unused-receiver
+          disabled: true
+        - name: use-errors-new
+          disabled: true
+
+    wsl:
+      allow-trailing-comment: true
+  exclusions:
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - govet
+        text: 'shadow: declaration of "err" shadows declaration'
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+formatters:
+  enable:
+    - gci
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/crowdsecurity)
+        - prefix(github.com/crowdsecurity/crowdsec)
+        - prefix(github.com/crowdsecurity/cs-aws-waf-bouncer)
+  exclusions:
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
