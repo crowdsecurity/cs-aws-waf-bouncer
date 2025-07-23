@@ -151,7 +151,7 @@ func (w *WAF) CreateRuleGroup(ruleGroupName string) error {
 
 func (w *WAF) UpdateRuleGroup() error {
 	rules := make([]wafv2types.Rule, 0)
-	var priority int32 = 0
+	var priority int32
 
 	if len(w.ipsetManager.IPSets) == 0 {
 		w.Logger.Debugf("No IPSets to add to rule group %s", w.config.RuleGroupName)
