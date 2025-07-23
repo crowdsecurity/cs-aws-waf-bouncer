@@ -11,6 +11,8 @@ import (
 	"strings"
 	"syscall"
 
+	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/coreos/go-systemd/v22/daemon"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
@@ -23,9 +25,6 @@ import (
 
 	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/cfg"
 	"github.com/crowdsecurity/cs-aws-waf-bouncer/pkg/waf"
-
-	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
-	"github.com/aws/aws-sdk-go/aws"
 )
 
 var wafInstances = make([]*waf.WAF, 0)
