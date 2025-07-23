@@ -35,7 +35,7 @@ func resourceCleanup() {
 	for _, w := range wafInstances {
 		w.Logger.Infof("Cleaning up resources")
 
-		// We are shutting down, cannot reuse the existing context as it may be cancelled
+		// We are shutting down, cannot reuse the existing context as it may be canceled
 		if err := w.Cleanup(context.Background()); err != nil {
 			log.Errorf("Error cleaning up WAF: %s", err)
 		}

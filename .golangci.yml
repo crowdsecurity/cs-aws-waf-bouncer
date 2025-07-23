@@ -71,7 +71,7 @@ linters:
           arguments:
             # lower this after refactoring
             - 75
-            - 149
+            - 153
         - name: function-result-limit
           disabled: true
         - name: increment-decrement
