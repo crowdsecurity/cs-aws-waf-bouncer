@@ -223,60 +223,60 @@ func (c *bouncerConfig) ValidateAndSetDefaults() error {
 		return fmt.Errorf("waf_config is required")
 	}
 
-	for _, c := range c.WebACLConfig {
-		if c.FallbackAction == "" {
+	for i, aclConfig := range c.WebACLConfig {
+		if aclConfig.FallbackAction == "" {
 			return fmt.Errorf("fallback_action is required")
 		}
 
-		if !slices.Contains(ValidActions, c.FallbackAction) {
+		if !slices.Contains(ValidActions, aclConfig.FallbackAction) {
 			return fmt.Errorf("fallback_action must be one of %v", ValidActions)
 		}
 
-		if c.RuleGroupName == "" {
+		if aclConfig.RuleGroupName == "" {
 			return fmt.Errorf("rule_group_name is required")
 		}
 
-		if c.Scope == "" {
+		if aclConfig.Scope == "" {
 			return fmt.Errorf("scope is required")
 		}
 
-		if c.IPHeader != "" && c.IPHeaderPosition == "" {
+		if aclConfig.IPHeader != "" && aclConfig.IPHeaderPosition == "" {
 			return fmt.Errorf("ip_header_position is required when ip_header is set")
 		}
 
-		if c.IPHeaderPosition != "" && !slices.Contains(validIpHeaderPosition, c.IPHeaderPosition) {
+		if aclConfig.IPHeaderPosition != "" && !slices.Contains(validIpHeaderPosition, aclConfig.IPHeaderPosition) {
 			return fmt.Errorf("ip_header_position must be one of %v", validIpHeaderPosition)
 		}
 
-		if !slices.Contains(validScopes, c.Scope) {
+		if !slices.Contains(validScopes, aclConfig.Scope) {
 			return fmt.Errorf("scope must be one of %v", validScopes)
 		}
 
-		if c.IpsetPrefix == "" {
+		if aclConfig.IpsetPrefix == "" {
 			return fmt.Errorf("ipset_prefix is required")
 		}
 
-		if c.Region == "" && strings.ToUpper(c.Scope) == "REGIONAL" {
+		if aclConfig.Region == "" && strings.ToUpper(aclConfig.Scope) == "REGIONAL" {
 			return fmt.Errorf("region is required when scope is REGIONAL")
 		}
 
 		ipsetPrefix := make(map[string]bool)
 		ruleGroupNames := make(map[string]bool)
 
-		if _, ok := ipsetPrefix[c.IpsetPrefix]; ok {
+		if _, ok := ipsetPrefix[aclConfig.IpsetPrefix]; ok {
 			return fmt.Errorf("ipset_prefix value must be unique")
 		}
 
-		ipsetPrefix[c.IpsetPrefix] = true
+		ipsetPrefix[aclConfig.IpsetPrefix] = true
 
-		if _, ok := ruleGroupNames[c.RuleGroupName]; ok {
+		if _, ok := ruleGroupNames[aclConfig.RuleGroupName]; ok {
 			return fmt.Errorf("rule_group_name value must be unique")
 		}
 
-		ruleGroupNames[c.RuleGroupName] = true
+		ruleGroupNames[aclConfig.RuleGroupName] = true
 
-		if c.Capacity == 0 {
-			c.Capacity = 300
+		if aclConfig.Capacity == 0 {
+			c.WebACLConfig[i].Capacity = 300
 		}
 	}
 

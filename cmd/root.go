@@ -11,6 +11,7 @@ import (
 	"strings"
 	"syscall"
 
+	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/coreos/go-systemd/v22/daemon"
 	log "github.com/sirupsen/logrus"
@@ -28,11 +29,14 @@ import (
 
 var wafInstances = make([]*waf.WAF, 0)
 
+var errSignalShutdown = errors.New("signal shutdown")
+
 func resourceCleanup() {
 	for _, w := range wafInstances {
 		w.Logger.Infof("Cleaning up resources")
 
-		if err := w.Cleanup(); err != nil {
+		// We are shutting down, cannot reuse the existing context as it may be canceled
+		if err := w.Cleanup(context.Background()); err != nil {
 			log.Errorf("Error cleaning up WAF: %s", err)
 		}
 	}
@@ -46,9 +50,9 @@ func HandleSignals(ctx context.Context) error {
 	case s := <-signalChan:
 		switch s {
 		case syscall.SIGTERM:
-			return errors.New("received SIGTERM")
+			return errSignalShutdown
 		case os.Interrupt: // cross-platform SIGINT
-			return errors.New("received interrupt")
+			return errSignalShutdown
 		}
 	case <-ctx.Done():
 		return ctx.Err()
@@ -63,8 +67,8 @@ func processDecisions(decisions *models.DecisionsStreamResponse, supportedAction
 		V6Add:        make(map[string][]*string),
 		V4Del:        make(map[string][]*string),
 		V6Del:        make(map[string][]*string),
-		CountriesAdd: make(map[string][]*string),
-		CountriesDel: make(map[string][]*string),
+		CountriesAdd: make(map[string][]wafv2types.CountryCode),
+		CountriesDel: make(map[string][]wafv2types.CountryCode),
 	}
 
 	for _, decision := range decisions.New {
@@ -88,7 +92,7 @@ func processDecisions(decisions *models.DecisionsStreamResponse, supportedAction
 				}
 			}
 		} else if strings.ToLower(*decision.Scope) == "country" {
-			d.CountriesAdd[decisionType] = append(d.CountriesAdd[decisionType], decision.Value)
+			d.CountriesAdd[decisionType] = append(d.CountriesAdd[decisionType], wafv2types.CountryCode(*decision.Value))
 		} else {
 			log.Errorf("unsupported scope: %s", *decision.Scope)
 		}
@@ -115,7 +119,7 @@ func processDecisions(decisions *models.DecisionsStreamResponse, supportedAction
 				}
 			}
 		} else if strings.ToLower(*decision.Scope) == "country" {
-			d.CountriesDel[decisionType] = append(d.CountriesDel[decisionType], decision.Value)
+			d.CountriesDel[decisionType] = append(d.CountriesDel[decisionType], wafv2types.CountryCode(*decision.Value))
 		} else {
 			log.Errorf("unsupported scope: %s", *decision.Scope)
 		}
@@ -171,11 +175,13 @@ func Execute() error {
 
 	log.Infof("Starting crowdsec-aws-waf-bouncer %s", version.String())
 
+	g, ctx := errgroup.WithContext(context.Background())
+
 	if *testConfig {
 		for _, wafConfig := range config.WebACLConfig {
 			log.Debugf("Create WAF instance with config: %+v", wafConfig)
 
-			_, err := waf.NewWaf(wafConfig)
+			_, err := waf.NewWaf(ctx, wafConfig)
 			if err != nil {
 				return fmt.Errorf("configuration error: %w", err)
 			}
@@ -207,12 +213,12 @@ func Execute() error {
 	for _, wafConfig := range config.WebACLConfig {
 		log.Debugf("Create WAF instance with config: %+v", wafConfig)
 
-		w, err := waf.NewWaf(wafConfig)
+		w, err := waf.NewWaf(ctx, wafConfig)
 		if err != nil {
 			return fmt.Errorf("could not create waf instance: %w", err)
 		}
 
-		err = w.Init()
+		err = w.Init(ctx)
 		if err != nil {
 			if os.Getenv("CS_AWS_WAF_BOUNCER_TESTING") == "" {
 				return fmt.Errorf("could not initialize waf instance: %w", err)
@@ -224,15 +230,12 @@ func Execute() error {
 		wafInstances = append(wafInstances, w)
 	}
 
-	g, ctx := errgroup.WithContext(context.Background())
-
 	g.Go(func() error {
 		return HandleSignals(ctx)
 	})
 
 	g.Go(func() error {
-		bouncer.Run(ctx)
-		return errors.New("bouncer stream halted")
+		return bouncer.Run(ctx)
 	})
 
 	if config.Daemon {
@@ -257,6 +260,10 @@ func Execute() error {
 				return nil
 			case decisions := <-bouncer.Stream:
 				log.Info("Polling decisions")
+				if decisions == nil {
+					log.Warning("received nil decisions")
+					continue
+				}
 
 				d := processDecisions(decisions, config.SupportedActions)
 				for _, w := range wafInstances {
@@ -267,6 +274,10 @@ func Execute() error {
 	})
 
 	if err := g.Wait(); err != nil {
+		if errors.Is(err, errSignalShutdown) {
+			log.Info("Received shutdown signal, exiting gracefully")
+			return nil
+		}
 		return fmt.Errorf("process terminated with error: %w", err)
 	}
 
