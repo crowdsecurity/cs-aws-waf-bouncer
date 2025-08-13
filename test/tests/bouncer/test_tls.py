@@ -25,7 +25,6 @@ def test_tls_server(crowdsec, certs_dir, api_key_factory, bouncer, aw_cfg_factor
         'USE_TLS': 'true',
         'LOCAL_API_URL': 'https://localhost:8080',
         'BOUNCER_KEY_custom': api_key,
-        'CROWDSEC_BYPASS_DB_VOLUME_CHECK': 'true',
     }
 
     certs = certs_dir(lapi_hostname='lapi')
@@ -71,7 +70,6 @@ def test_tls_mutual(crowdsec, certs_dir, api_key_factory, bouncer, aw_cfg_factor
         'LAPI_KEY_FILE': '/etc/ssl/crowdsec/lapi.key',
         'USE_TLS': 'true',
         'LOCAL_API_URL': 'https://localhost:8080',
-        'CROWDSEC_BYPASS_DB_VOLUME_CHECK': 'true',
     }
 
     certs = certs_dir(lapi_hostname='lapi')
