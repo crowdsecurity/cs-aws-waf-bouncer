@@ -547,43 +547,47 @@ func (w *WAF) Init(ctx context.Context) error {
 func (w *WAF) UpdateSetsContent(ctx context.Context, d Decisions) error {
 	var err error
 
-	for action, ips := range d.V4Add {
-		if action == "fallback" {
-			action = strings.ToLower(w.config.FallbackAction)
+	if w.config.DisableIPv4 == nil || !*w.config.DisableIPv4 {
+		for action, ips := range d.V4Add {
+			if action == "fallback" {
+				action = strings.ToLower(w.config.FallbackAction)
+			}
+
+			for _, ip := range ips {
+				w.ipsetManager.AddIp(*ip, action)
+			}
 		}
 
-		for _, ip := range ips {
-			w.ipsetManager.AddIp(*ip, action)
-		}
-	}
+		for action, ips := range d.V4Del {
+			if action == "fallback" {
+				action = strings.ToLower(w.config.FallbackAction)
+			}
 
-	for action, ips := range d.V4Del {
-		if action == "fallback" {
-			action = strings.ToLower(w.config.FallbackAction)
-		}
-
-		for _, ip := range ips {
-			w.ipsetManager.DeleteIp(*ip, action)
-		}
-	}
-
-	for action, ips := range d.V6Add {
-		if action == "fallback" {
-			action = strings.ToLower(w.config.FallbackAction)
-		}
-
-		for _, ip := range ips {
-			w.ipsetManager.AddIp(*ip, action)
+			for _, ip := range ips {
+				w.ipsetManager.DeleteIp(*ip, action)
+			}
 		}
 	}
 
-	for action, ips := range d.V6Del {
-		if action == "fallback" {
-			action = strings.ToLower(w.config.FallbackAction)
+	if w.config.DisableIPv6 == nil || !*w.config.DisableIPv6 {
+		for action, ips := range d.V6Add {
+			if action == "fallback" {
+				action = strings.ToLower(w.config.FallbackAction)
+			}
+
+			for _, ip := range ips {
+				w.ipsetManager.AddIp(*ip, action)
+			}
 		}
 
-		for _, ip := range ips {
-			w.ipsetManager.DeleteIp(*ip, action)
+		for action, ips := range d.V6Del {
+			if action == "fallback" {
+				action = strings.ToLower(w.config.FallbackAction)
+			}
+
+			for _, ip := range ips {
+				w.ipsetManager.DeleteIp(*ip, action)
+			}
 		}
 	}
 

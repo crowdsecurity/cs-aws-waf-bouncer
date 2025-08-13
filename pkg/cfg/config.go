@@ -28,6 +28,8 @@ type bouncerConfig struct {
 	CertPath           string        `yaml:"cert_path"`
 	CAPath             string        `yaml:"ca_cert_path"`
 	SupportedActions   []string      `yaml:"supported_actions"`
+	DisableIPv4        *bool         `yaml:"disable_ipv4"`
+	DisableIPv6        *bool         `yaml:"disable_ipv6"`
 }
 
 type AclConfig struct {
@@ -44,6 +46,8 @@ type AclConfig struct {
 	CloudWatchEnabled    bool   `yaml:"cloudwatch_enabled"`
 	CloudWatchMetricName string `yaml:"cloudwatch_metric_name"`
 	SampleRequests       bool   `yaml:"sample_requests"`
+	DisableIPv4          *bool  `yaml:"disable_ipv4"`
+	DisableIPv6          *bool  `yaml:"disable_ipv6"`
 }
 
 var ValidActions = []string{"ban", "captcha", "count"}
@@ -124,6 +128,22 @@ func getConfigFromEnv(config *bouncerConfig) {
 						log.Warnf("Invalid value for %s: %s, defaulting to false", key, value)
 						acl.SampleRequests = false
 					}
+				case "DISABLE_IPV4":
+					b, err := strconv.ParseBool(value)
+					if err != nil {
+						log.Warnf("Invalid value for %s: %s, defaulting to false", key, value)
+						acl.DisableIPv4 = aws.Bool(false)
+					} else {
+						acl.DisableIPv4 = aws.Bool(b)
+					}
+				case "DISABLE_IPV6":
+					b, err := strconv.ParseBool(value)
+					if err != nil {
+						log.Warnf("Invalid value for %s: %s, defaulting to false", key, value)
+						acl.DisableIPv6 = aws.Bool(false)
+					} else {
+						acl.DisableIPv6 = aws.Bool(b)
+					}
 				}
 			} else {
 				switch key {
@@ -178,6 +198,22 @@ func getConfigFromEnv(config *bouncerConfig) {
 					config.CAPath = value
 				case "BOUNCER_SUPPORTED_ACTIONS":
 					config.SupportedActions = strings.Split(value, ",")
+				case "BOUNCER_DISABLE_IPV4":
+					b, err := strconv.ParseBool(value)
+					if err != nil {
+						log.Warnf("Invalid value for %s: %s, defaulting to false", key, value)
+						config.DisableIPv4 = aws.Bool(false)
+					} else {
+						config.DisableIPv4 = aws.Bool(b)
+					}
+				case "BOUNCER_DISABLE_IPV6":
+					b, err := strconv.ParseBool(value)
+					if err != nil {
+						log.Warnf("Invalid value for %s: %s, defaulting to false", key, value)
+						config.DisableIPv6 = aws.Bool(false)
+					} else {
+						config.DisableIPv6 = aws.Bool(b)
+					}
 				}
 			}
 		}
@@ -221,6 +257,14 @@ func (c *bouncerConfig) ValidateAndSetDefaults() error {
 
 	if len(c.WebACLConfig) == 0 {
 		return fmt.Errorf("waf_config is required")
+	}
+
+	// Default root-level IPv4/IPv6 disable flags to false if not set
+	if c.DisableIPv4 == nil {
+		c.DisableIPv4 = aws.Bool(false)
+	}
+	if c.DisableIPv6 == nil {
+		c.DisableIPv6 = aws.Bool(false)
 	}
 
 	for i, aclConfig := range c.WebACLConfig {
@@ -277,6 +321,14 @@ func (c *bouncerConfig) ValidateAndSetDefaults() error {
 
 		if aclConfig.Capacity == 0 {
 			c.WebACLConfig[i].Capacity = 300
+		}
+
+		// Inherit IPv4/IPv6 disable flags from root when not set on WAF config
+		if aclConfig.DisableIPv4 == nil {
+			c.WebACLConfig[i].DisableIPv4 = c.DisableIPv4
+		}
+		if aclConfig.DisableIPv6 == nil {
+			c.WebACLConfig[i].DisableIPv6 = c.DisableIPv6
 		}
 	}
 
