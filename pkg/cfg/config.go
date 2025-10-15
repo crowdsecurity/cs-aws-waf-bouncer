@@ -13,7 +13,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/crowdsecurity/go-cs-lib/csstring"
-	"github.com/crowdsecurity/go-cs-lib/yamlpatch"
+	"github.com/crowdsecurity/go-cs-lib/csyaml"
 )
 
 type bouncerConfig struct {
@@ -284,7 +284,7 @@ func (c *bouncerConfig) ValidateAndSetDefaults() error {
 }
 
 func MergedConfig(configPath string) ([]byte, error) {
-	patcher := yamlpatch.NewPatcher(configPath, ".local")
+	patcher := csyaml.NewPatcher(configPath, ".local")
 	data, err := patcher.MergedPatchContent()
 
 	if err != nil {
