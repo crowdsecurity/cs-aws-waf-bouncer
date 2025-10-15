@@ -27,6 +27,9 @@ linters:
     - varnamelen
     - wrapcheck
     - wsl
+    - funcorder
+    - noinlineerr
+    - wsl_v5
   settings:
     errcheck:
       check-type-assertions: false
@@ -67,6 +70,8 @@ linters:
             - 46
         - name: comment-spacings
           disabled: true
+        - name: enforce-switch-style
+          disabled: true
         - name: function-length
           arguments:
             # lower this after refactoring
@@ -78,6 +83,8 @@ linters:
           disabled: true
         - name: get-return
           disabled: true
+        - name: identical-switch-branches
+          disabled: true
         - name: line-length-limit
           arguments:
             # lower this after refactoring
@@ -85,6 +92,8 @@ linters:
         - name: exported
           disabled: true
         - name: unexported-return
+          disabled: true
+        - name: unnecessary-format
           disabled: true
         - name: var-naming
           disabled: true
