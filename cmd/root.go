@@ -11,8 +11,8 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/coreos/go-systemd/v22/daemon"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/slices"
