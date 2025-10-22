@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/wafv2 v1.63.2
 	github.com/aws/smithy-go v1.23.0
 	github.com/coreos/go-systemd/v22 v22.6.0
-	github.com/crowdsecurity/crowdsec v1.7.1-rc4
+	github.com/crowdsecurity/crowdsec v1.7.2
 	github.com/crowdsecurity/go-cs-bouncer v0.0.18
 	github.com/crowdsecurity/go-cs-lib v0.0.23
 	github.com/google/uuid v1.6.0
