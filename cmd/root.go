@@ -61,7 +61,94 @@ func HandleSignals(ctx context.Context) error {
 	return nil
 }
 
-func processDecisions(decisions *models.DecisionsStreamResponse, supportedActions []string) waf.Decisions {
+func processDecisions(decisions *models.DecisionsStreamResponse, supportedActions []string) []cfg.ProcessedDecision {
+	processed := make([]cfg.ProcessedDecision, 0)
+
+	for _, decision := range decisions.New {
+		decisionType := strings.ToLower(*decision.Type)
+		if !slices.Contains(supportedActions, decisionType) {
+			decisionType = "fallback"
+		}
+
+		processed = append(processed, buildProcessedDecision(decision, decisionType, "add")...)
+	}
+
+	for _, decision := range decisions.Deleted {
+		decisionType := strings.ToLower(*decision.Type)
+		if !slices.Contains(supportedActions, decisionType) {
+			decisionType = "fallback"
+		}
+
+		processed = append(processed, buildProcessedDecision(decision, decisionType, "del")...)
+	}
+
+	return processed
+}
+
+func buildProcessedDecision(decision *models.Decision, decisionType string, op string) []cfg.ProcessedDecision {
+	if decision == nil || decision.Scope == nil || decision.Value == nil {
+		return nil
+	}
+
+	scope := strings.ToLower(*decision.Scope)
+	value := *decision.Value
+	origin := ""
+	scenario := ""
+
+	if decision.Origin != nil {
+		origin = *decision.Origin
+	}
+
+	if decision.Scenario != nil {
+		scenario = *decision.Scenario
+	}
+
+	switch scope {
+	case "ip", "range":
+		if strings.Contains(value, ":") {
+			if !strings.Contains(value, "/") {
+				value = fmt.Sprintf("%s/128", value)
+			}
+
+			return []cfg.ProcessedDecision{{
+				Action:   decisionType,
+				Target:   "v6",
+				Value:    value,
+				Op:       op,
+				Origin:   origin,
+				Scenario: scenario,
+			}}
+		}
+
+		if !strings.Contains(value, "/") {
+			value = fmt.Sprintf("%s/32", value)
+		}
+
+		return []cfg.ProcessedDecision{{
+			Action:   decisionType,
+			Target:   "v4",
+			Value:    value,
+			Op:       op,
+			Origin:   origin,
+			Scenario: scenario,
+		}}
+	case "country":
+		return []cfg.ProcessedDecision{{
+			Action:   decisionType,
+			Target:   "country",
+			Value:    value,
+			Op:       op,
+			Origin:   origin,
+			Scenario: scenario,
+		}}
+	default:
+		log.Errorf("unsupported scope: %s", scope)
+	}
+
+	return nil
+}
+
+func aggregateDecisions(processed []cfg.ProcessedDecision) waf.Decisions {
 	d := waf.Decisions{
 		V4Add:        make(map[string][]*string),
 		V6Add:        make(map[string][]*string),
@@ -71,57 +158,31 @@ func processDecisions(decisions *models.DecisionsStreamResponse, supportedAction
 		CountriesDel: make(map[string][]wafv2types.CountryCode),
 	}
 
-	for _, decision := range decisions.New {
-		decisionType := strings.ToLower(*decision.Type)
-		if !slices.Contains(supportedActions, decisionType) {
-			decisionType = "fallback"
-		}
-
-		if strings.ToLower(*decision.Scope) == "ip" || strings.ToLower(*decision.Scope) == "range" {
-			if strings.Contains(*decision.Value, ":") {
-				if !strings.Contains(*decision.Value, "/") {
-					d.V6Add[decisionType] = append(d.V6Add[decisionType], aws.String(fmt.Sprintf("%s/128", *decision.Value)))
-				} else {
-					d.V6Add[decisionType] = append(d.V6Add[decisionType], decision.Value)
-				}
-			} else {
-				if !strings.Contains(*decision.Value, "/") {
-					d.V4Add[decisionType] = append(d.V4Add[decisionType], aws.String(fmt.Sprintf("%s/32", *decision.Value)))
-				} else {
-					d.V4Add[decisionType] = append(d.V4Add[decisionType], decision.Value)
-				}
+	for _, p := range processed {
+		switch p.Target {
+		case "v4":
+			switch p.Op {
+			case "add":
+				d.V4Add[p.Action] = append(d.V4Add[p.Action], aws.String(p.Value))
+			case "del":
+				d.V4Del[p.Action] = append(d.V4Del[p.Action], aws.String(p.Value))
 			}
-		} else if strings.ToLower(*decision.Scope) == "country" {
-			d.CountriesAdd[decisionType] = append(d.CountriesAdd[decisionType], wafv2types.CountryCode(*decision.Value))
-		} else {
-			log.Errorf("unsupported scope: %s", *decision.Scope)
-		}
-	}
-
-	for _, decision := range decisions.Deleted {
-		decisionType := strings.ToLower(*decision.Type)
-		if !slices.Contains(supportedActions, decisionType) {
-			decisionType = "fallback"
-		}
-
-		if strings.ToLower(*decision.Scope) == "ip" || strings.ToLower(*decision.Scope) == "range" {
-			if strings.Contains(*decision.Value, ":") {
-				if !strings.Contains(*decision.Value, "/") {
-					d.V6Del[decisionType] = append(d.V6Del[decisionType], aws.String(fmt.Sprintf("%s/128", *decision.Value)))
-				} else {
-					d.V6Del[decisionType] = append(d.V6Del[decisionType], decision.Value)
-				}
-			} else {
-				if !strings.Contains(*decision.Value, "/") {
-					d.V4Del[decisionType] = append(d.V4Del[decisionType], aws.String(fmt.Sprintf("%s/32", *decision.Value)))
-				} else {
-					d.V4Del[decisionType] = append(d.V4Del[decisionType], decision.Value)
-				}
+		case "v6":
+			switch p.Op {
+			case "add":
+				d.V6Add[p.Action] = append(d.V6Add[p.Action], aws.String(p.Value))
+			case "del":
+				d.V6Del[p.Action] = append(d.V6Del[p.Action], aws.String(p.Value))
 			}
-		} else if strings.ToLower(*decision.Scope) == "country" {
-			d.CountriesDel[decisionType] = append(d.CountriesDel[decisionType], wafv2types.CountryCode(*decision.Value))
-		} else {
-			log.Errorf("unsupported scope: %s", *decision.Scope)
+		case "country":
+			switch p.Op {
+			case "add":
+				d.CountriesAdd[p.Action] = append(d.CountriesAdd[p.Action], wafv2types.CountryCode(p.Value))
+			case "del":
+				d.CountriesDel[p.Action] = append(d.CountriesDel[p.Action], wafv2types.CountryCode(p.Value))
+			}
+		default:
+			log.Errorf("unsupported target: %s", p.Target)
 		}
 	}
 
@@ -265,9 +326,15 @@ func Execute() error {
 					continue
 				}
 
-				d := processDecisions(decisions, config.SupportedActions)
+				processed := processDecisions(decisions, config.SupportedActions)
+
 				for _, w := range wafInstances {
-					w.DecisionsChan <- d
+					filteredDecisions := w.GetDecisionsFilter().Apply(processed)
+					if len(filteredDecisions) == 0 {
+						continue
+					}
+
+					w.DecisionsChan <- aggregateDecisions(filteredDecisions)
 				}
 			}
 		}
