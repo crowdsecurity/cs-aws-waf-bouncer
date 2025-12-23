@@ -30,20 +30,100 @@ type bouncerConfig struct {
 	SupportedActions   []string      `yaml:"supported_actions"`
 }
 
+type DecisionsFilter struct {
+	IncludeOrigins   []string `yaml:"include_origins"`
+	ExcludeOrigins   []string `yaml:"exclude_origins"`
+	IncludeScenarios []string `yaml:"include_scenarios"`
+	ExcludeScenarios []string `yaml:"exclude_scenarios"`
+}
+
+type ProcessedDecision struct {
+	Action   string
+	Target   string // v4, v6, country
+	Value    string
+	Op       string // add or del
+	Origin   string
+	Scenario string
+}
+
+func (d DecisionsFilter) isEmpty() bool {
+	return len(d.IncludeOrigins) == 0 &&
+		len(d.ExcludeOrigins) == 0 &&
+		len(d.IncludeScenarios) == 0 &&
+		len(d.ExcludeScenarios) == 0
+}
+
+func matchValue(value *string, include []string, exclude []string) bool {
+	if value == nil {
+		return false
+	}
+
+	for _, excluded := range exclude {
+		if strings.EqualFold(excluded, *value) {
+			return false
+		}
+	}
+
+	if len(include) == 0 {
+		return true
+	}
+
+	for _, allowed := range include {
+		if strings.EqualFold(allowed, *value) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (d DecisionsFilter) allow(decision ProcessedDecision) bool {
+	if d.isEmpty() {
+		return true
+	}
+
+	if !matchValue(&decision.Origin, d.IncludeOrigins, d.ExcludeOrigins) {
+		return false
+	}
+
+	if !matchValue(&decision.Scenario, d.IncludeScenarios, d.ExcludeScenarios) {
+		return false
+	}
+
+	return true
+}
+
+func (d DecisionsFilter) Apply(decisions []ProcessedDecision) []ProcessedDecision {
+	if d.isEmpty() {
+		return decisions
+	}
+
+	filtered := make([]ProcessedDecision, 0, len(decisions))
+
+	for _, decision := range decisions {
+		if d.allow(decision) {
+			filtered = append(filtered, decision)
+		}
+	}
+
+	return filtered
+}
+
 type AclConfig struct {
-	WebACLName           string `yaml:"web_acl_name"`
-	RuleGroupName        string `yaml:"rule_group_name"`
-	Region               string `yaml:"region"`
-	Scope                string `yaml:"scope"`
-	IpsetPrefix          string `yaml:"ipset_prefix"`
-	FallbackAction       string `yaml:"fallback_action"`
-	AWSProfile           string `yaml:"aws_profile"`
-	IPHeader             string `yaml:"ip_header"`
-	IPHeaderPosition     string `yaml:"ip_header_position"`
-	Capacity             int    `yaml:"capacity"`
-	CloudWatchEnabled    bool   `yaml:"cloudwatch_enabled"`
-	CloudWatchMetricName string `yaml:"cloudwatch_metric_name"`
-	SampleRequests       bool   `yaml:"sample_requests"`
+	WebACLName           string          `yaml:"web_acl_name"`
+	RuleGroupName        string          `yaml:"rule_group_name"`
+	Region               string          `yaml:"region"`
+	Scope                string          `yaml:"scope"`
+	IpsetPrefix          string          `yaml:"ipset_prefix"`
+	FallbackAction       string          `yaml:"fallback_action"`
+	AWSProfile           string          `yaml:"aws_profile"`
+	IPHeader             string          `yaml:"ip_header"`
+	IPHeaderPosition     string          `yaml:"ip_header_position"`
+	Capacity             int             `yaml:"capacity"`
+	CloudWatchEnabled    bool            `yaml:"cloudwatch_enabled"`
+	CloudWatchMetricName string          `yaml:"cloudwatch_metric_name"`
+	SampleRequests       bool            `yaml:"sample_requests"`
+	DecisionsFilter      DecisionsFilter `yaml:"decisions_filter"`
 }
 
 var ValidActions = []string{"ban", "captcha", "count"}
@@ -124,6 +204,14 @@ func getConfigFromEnv(config *bouncerConfig) {
 						log.Warnf("Invalid value for %s: %s, defaulting to false", key, value)
 						acl.SampleRequests = false
 					}
+				case "DECISIONS_FILTER_INCLUDE_ORIGINS":
+					acl.DecisionsFilter.IncludeOrigins = strings.Split(value, ",")
+				case "DECISIONS_FILTER_EXCLUDE_ORIGINS":
+					acl.DecisionsFilter.ExcludeOrigins = strings.Split(value, ",")
+				case "DECISIONS_FILTER_INCLUDE_SCENARIOS":
+					acl.DecisionsFilter.IncludeScenarios = strings.Split(value, ",")
+				case "DECISIONS_FILTER_EXCLUDE_SCENARIOS":
+					acl.DecisionsFilter.ExcludeScenarios = strings.Split(value, ",")
 				}
 			} else {
 				switch key {

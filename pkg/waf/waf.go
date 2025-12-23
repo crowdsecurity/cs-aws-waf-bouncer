@@ -701,6 +701,14 @@ func (w *WAF) UpdateGeoSet(ctx context.Context, d Decisions) error {
 	return nil
 }
 
+func (w *WAF) GetDecisionsFilter() cfg.DecisionsFilter {
+	if w.config == nil {
+		return cfg.DecisionsFilter{}
+	}
+
+	return w.config.DecisionsFilter
+}
+
 func (w *WAF) Process(ctx context.Context) error {
 	for {
 		select {
