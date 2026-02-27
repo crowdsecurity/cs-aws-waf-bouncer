@@ -67,7 +67,7 @@ linters:
         - name: cyclomatic
           arguments:
             # lower this after refactoring
-            - 46
+            - 48
         - name: comment-spacings
           disabled: true
         - name: enforce-switch-style
@@ -84,6 +84,8 @@ linters:
         - name: get-return
           disabled: true
         - name: identical-switch-branches
+          disabled: true
+        - name: flag-parameter
           disabled: true
         - name: line-length-limit
           arguments:

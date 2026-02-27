@@ -8,7 +8,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
-	"github.com/crowdsecurity/go-cs-lib/ptr"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -131,7 +130,7 @@ func (im *IPSetManager) DeleteAllSets(ctx context.Context, prefix string, setsIn
 			im.logger.Infof("deleting set %s", setName)
 
 			_, err := im.client.DeleteIPSet(ctx, &wafv2.DeleteIPSetInput{
-				Id:    ptr.Of(setInfo.Id),
+				Id:    &setInfo.Id,
 				Name:  aws.String(setName),
 				Scope: wafv2types.Scope(setInfo.Scope),
 			})
