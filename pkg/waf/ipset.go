@@ -3,6 +3,7 @@ package waf
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
@@ -199,8 +200,12 @@ func (w *WAFIpSet) Commit(ctx context.Context) error {
 
 func NewIpSet(setPrefix string, ipType string, decisionType string, scope string, client *wafv2.Client) *WAFIpSet {
 	u := uuid.New()
+	now := fmt.Sprint(time.Now().Unix())
 	setName := setPrefix + "-" + ipType + "-" + decisionType + "-" + u.String()
 
+	if len(setName)+len(now) < 128 {
+		setName = setName + "-" + now
+	}
 	return &WAFIpSet{
 		name:         setName,
 		ipType:       ipType,
