@@ -201,7 +201,7 @@ func (w *WAFIpSet) Commit(ctx context.Context) error {
 func NewIpSet(setPrefix string, ipType string, decisionType string, scope string, client *wafv2.Client) *WAFIpSet {
 	u := uuid.New()
 	now := fmt.Sprint(time.Now().Unix())
-	setName := setPrefix + "-" + ipType + "-" + decisionType + "-" + now + u.String()
+	setName := setPrefix + "-" + ipType + "-" + decisionType + "-" + now + "-" + u.String()
 	logger := log.WithField("set", setName)
 
 	if len(setName) > 128 {
