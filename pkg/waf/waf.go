@@ -34,8 +34,9 @@ type WAF struct {
 }
 
 type IpSet struct {
-	ARN string
-	Id  string
+	ARN   string
+	Id    string
+	Scope string
 }
 
 type RuleGroup struct {
@@ -265,8 +266,9 @@ func (w *WAF) ListIpSet(ctx context.Context) (map[string]IpSet, error) {
 
 	for _, set := range r.IPSets {
 		sets[*set.Name] = IpSet{
-			ARN: *set.ARN,
-			Id:  *set.Id,
+			ARN:   *set.ARN,
+			Id:    *set.Id,
+			Scope: w.config.Scope,
 		}
 	}
 
@@ -413,7 +415,7 @@ func (w *WAF) GetRuleGroup(ctx context.Context, ruleGroupname string) (string, w
 	return *r.LockToken, *r.RuleGroup, nil
 }
 
-func (w *WAF) CleanupAcl(ctx context.Context, acl *wafv2types.WebACL, token *string) error {
+func (w *WAF) CleanupAcl(ctx context.Context, acl *wafv2types.WebACL, token *string, allSets bool) error {
 	err := w.RemoveRuleGroupFromACL(ctx, acl, token)
 	if err != nil {
 		return fmt.Errorf("error removing rule group from ACL: %w", err)
@@ -435,8 +437,11 @@ func (w *WAF) CleanupAcl(ctx context.Context, acl *wafv2types.WebACL, token *str
 		log.Debugf("RuleGroup %s not found, nothing to do", w.config.RuleGroupName)
 	}
 
-	w.ipsetManager.DeleteSets(ctx)
-
+	if !allSets {
+		w.ipsetManager.DeleteSets(ctx)
+	} else {
+		w.ipsetManager.DeleteAllSets(ctx, w.config.IpsetPrefix, w.setsInfos)
+	}
 	return nil
 }
 
@@ -456,7 +461,7 @@ func (w *WAF) Cleanup(ctx context.Context) error {
 		return fmt.Errorf("failed to get WebACL: %w", err)
 	}
 
-	return w.CleanupAcl(ctx, acl, token)
+	return w.CleanupAcl(ctx, acl, token, false)
 }
 
 func (w *WAF) ListResources(ctx context.Context) (map[string]Acl, map[string]IpSet, map[string]RuleGroup, error) {
@@ -509,7 +514,7 @@ func (w *WAF) Init(ctx context.Context) error {
 
 	w.ipsetManager = NewIPSetManager(w.config.IpsetPrefix, w.config.Scope, w.client, w.Logger)
 
-	err = w.CleanupAcl(ctx, acl, token)
+	err = w.CleanupAcl(ctx, acl, token, w.config.CleanOnStart)
 
 	if err != nil {
 		return fmt.Errorf("failed to cleanup: %w", err)

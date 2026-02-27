@@ -3,6 +3,7 @@ package waf
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
@@ -199,13 +200,21 @@ func (w *WAFIpSet) Commit(ctx context.Context) error {
 
 func NewIpSet(setPrefix string, ipType string, decisionType string, scope string, client *wafv2.Client) *WAFIpSet {
 	u := uuid.New()
-	setName := setPrefix + "-" + ipType + "-" + decisionType + "-" + u.String()
+	now := fmt.Sprint(time.Now().Unix())
+	setName := setPrefix + "-" + ipType + "-" + decisionType + "-" + now + "-" + u.String()
+	logger := log.WithField("set", setName)
+
+	if len(setName) > 128 {
+		logger.Warnf(`Set name is longer than the 128 characters limit and will be truncated.` +
+			`This is likely to cause duplicate set name and issues. Please reduce the length of the prefix`)
+		setName = setName[:128]
+	}
 
 	return &WAFIpSet{
 		name:         setName,
 		ipType:       ipType,
 		decisionType: decisionType,
-		logger:       log.WithField("set", setName),
+		logger:       logger,
 		scope:        scope,
 		client:       client,
 	}

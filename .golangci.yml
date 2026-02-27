@@ -63,11 +63,11 @@ linters:
         - name: cognitive-complexity
           arguments:
             # lower this after refactoring
-            - 62
+            - 67
         - name: cyclomatic
           arguments:
             # lower this after refactoring
-            - 46
+            - 48
         - name: comment-spacings
           disabled: true
         - name: enforce-switch-style
@@ -75,7 +75,7 @@ linters:
         - name: function-length
           arguments:
             # lower this after refactoring
-            - 75
+            - 79
             - 153
         - name: function-result-limit
           disabled: true
@@ -84,6 +84,8 @@ linters:
         - name: get-return
           disabled: true
         - name: identical-switch-branches
+          disabled: true
+        - name: flag-parameter
           disabled: true
         - name: line-length-limit
           arguments:

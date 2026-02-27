@@ -44,6 +44,7 @@ type AclConfig struct {
 	CloudWatchEnabled    bool   `yaml:"cloudwatch_enabled"`
 	CloudWatchMetricName string `yaml:"cloudwatch_metric_name"`
 	SampleRequests       bool   `yaml:"sample_requests"`
+	CleanOnStart         bool   `yaml:"remove_sets_on_start"`
 }
 
 var ValidActions = []string{"ban", "captcha", "count"}
@@ -71,8 +72,7 @@ func getConfigFromEnv(config *bouncerConfig) {
 			key = s[0]
 			value = s[1]
 
-			if strings.HasPrefix(key, "BOUNCER_WAF_CONFIG_") {
-				k2 := strings.TrimPrefix(key, "BOUNCER_WAF_CONFIG_")
+			if k2, ok := strings.CutPrefix(key, "BOUNCER_WAF_CONFIG_"); ok {
 				if k2[0] < '0' || k2[0] > '9' || len(k2) < 3 {
 					log.Warnf("Invalid name for %s: BOUNCER_WAF_CONFIG_* must be in the form BOUNCER_WAF_CONFIG_0_XXX, BOUNCER_WAF_CONFIG_1_XXX", key)
 				}
@@ -123,6 +123,12 @@ func getConfigFromEnv(config *bouncerConfig) {
 					if err != nil {
 						log.Warnf("Invalid value for %s: %s, defaulting to false", key, value)
 						acl.SampleRequests = false
+					}
+				case "CLEAN_ON_START":
+					acl.CleanOnStart, err = strconv.ParseBool(value)
+					if err != nil {
+						log.Warnf("Invalid value for %s: %s, defaulting to false", key, value)
+						acl.CleanOnStart = false
 					}
 				}
 			} else {
