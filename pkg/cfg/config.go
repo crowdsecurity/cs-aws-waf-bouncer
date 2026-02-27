@@ -44,7 +44,7 @@ type AclConfig struct {
 	CloudWatchEnabled    bool   `yaml:"cloudwatch_enabled"`
 	CloudWatchMetricName string `yaml:"cloudwatch_metric_name"`
 	SampleRequests       bool   `yaml:"sample_requests"`
-	CleanOnStart         bool   `yaml:"clean_on_start"`
+	CleanOnStart         bool   `yaml:"remove_sets_on_start"`
 }
 
 var ValidActions = []string{"ban", "captcha", "count"}
