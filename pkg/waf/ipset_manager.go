@@ -129,10 +129,22 @@ func (im *IPSetManager) DeleteAllSets(ctx context.Context, prefix string, setsIn
 		if strings.HasPrefix(setName, prefix) {
 			im.logger.Infof("deleting set %s", setName)
 
-			_, err := im.client.DeleteIPSet(ctx, &wafv2.DeleteIPSetInput{
-				Id:    &setInfo.Id,
+			r, err := im.client.GetIPSet(ctx, &wafv2.GetIPSetInput{
 				Name:  aws.String(setName),
 				Scope: wafv2types.Scope(setInfo.Scope),
+				Id:    aws.String(setInfo.Id),
+			})
+
+			if err != nil {
+				im.logger.Errorf("could not get set %s: %s", setName, err)
+				continue
+			}
+
+			_, err = im.client.DeleteIPSet(ctx, &wafv2.DeleteIPSetInput{
+				Id:        &setInfo.Id,
+				Name:      aws.String(setName),
+				Scope:     wafv2types.Scope(setInfo.Scope),
+				LockToken: r.LockToken,
 			})
 
 			if err != nil {
