@@ -205,7 +205,8 @@ func NewIpSet(setPrefix string, ipType string, decisionType string, scope string
 	logger := log.WithField("set", setName)
 
 	if len(setName) > 128 {
-		logger.Warnf("Set name is longer than the 128 characters limit and will be truncated. This is likely to cause duplicate set name and issues. Please reduce the length of the prefix")
+		logger.Warnf(`Set name is longer than the 128 characters limit and will be truncated.` +
+			`This is likely to cause duplicate set name and issues. Please reduce the length of the prefix`)
 		setName = setName[:128]
 	}
 
