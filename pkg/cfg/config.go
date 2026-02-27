@@ -72,8 +72,7 @@ func getConfigFromEnv(config *bouncerConfig) {
 			key = s[0]
 			value = s[1]
 
-			if strings.HasPrefix(key, "BOUNCER_WAF_CONFIG_") {
-				k2 := strings.TrimPrefix(key, "BOUNCER_WAF_CONFIG_")
+			if k2, ok := strings.CutPrefix(key, "BOUNCER_WAF_CONFIG_"); ok {
 				if k2[0] < '0' || k2[0] > '9' || len(k2) < 3 {
 					log.Warnf("Invalid name for %s: BOUNCER_WAF_CONFIG_* must be in the form BOUNCER_WAF_CONFIG_0_XXX, BOUNCER_WAF_CONFIG_1_XXX", key)
 				}

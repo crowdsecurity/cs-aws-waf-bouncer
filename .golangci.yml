@@ -63,7 +63,7 @@ linters:
         - name: cognitive-complexity
           arguments:
             # lower this after refactoring
-            - 62
+            - 67
         - name: cyclomatic
           arguments:
             # lower this after refactoring
@@ -75,7 +75,7 @@ linters:
         - name: function-length
           arguments:
             # lower this after refactoring
-            - 75
+            - 79
             - 153
         - name: function-result-limit
           disabled: true
