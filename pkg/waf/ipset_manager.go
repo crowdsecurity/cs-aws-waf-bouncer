@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
+	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
+	"github.com/crowdsecurity/go-cs-lib/ptr"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -117,6 +120,25 @@ func (im *IPSetManager) DeleteSets(ctx context.Context) {
 		err := ipset.DeleteIpSet(ctx)
 		if err != nil {
 			im.logger.Errorf("could not delete set %s: %s", ipset.GetName(), err)
+		}
+	}
+}
+
+func (im *IPSetManager) DeleteAllSets(ctx context.Context, prefix string, setsInfos map[string]IpSet) {
+	// Used on startup, so don't rely on any internal state and delete all sets with the right prefix
+	for setName, setInfo := range setsInfos {
+		if strings.HasPrefix(setName, prefix) {
+			im.logger.Infof("deleting set %s", setName)
+
+			_, err := im.client.DeleteIPSet(ctx, &wafv2.DeleteIPSetInput{
+				Id:    ptr.Of(setInfo.Id),
+				Name:  aws.String(setName),
+				Scope: wafv2types.Scope(setInfo.Scope),
+			})
+
+			if err != nil {
+				im.logger.Errorf("could not delete set %s: %s", setName, err)
+			}
 		}
 	}
 }

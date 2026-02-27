@@ -44,6 +44,7 @@ type AclConfig struct {
 	CloudWatchEnabled    bool   `yaml:"cloudwatch_enabled"`
 	CloudWatchMetricName string `yaml:"cloudwatch_metric_name"`
 	SampleRequests       bool   `yaml:"sample_requests"`
+	CleanOnStart         bool   `yaml:"clean_on_start"`
 }
 
 var ValidActions = []string{"ban", "captcha", "count"}
@@ -123,6 +124,12 @@ func getConfigFromEnv(config *bouncerConfig) {
 					if err != nil {
 						log.Warnf("Invalid value for %s: %s, defaulting to false", key, value)
 						acl.SampleRequests = false
+					}
+				case "CLEAN_ON_START":
+					acl.CleanOnStart, err = strconv.ParseBool(value)
+					if err != nil {
+						log.Warnf("Invalid value for %s: %s, defaulting to false", key, value)
+						acl.CleanOnStart = false
 					}
 				}
 			} else {
