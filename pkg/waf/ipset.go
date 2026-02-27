@@ -201,16 +201,19 @@ func (w *WAFIpSet) Commit(ctx context.Context) error {
 func NewIpSet(setPrefix string, ipType string, decisionType string, scope string, client *wafv2.Client) *WAFIpSet {
 	u := uuid.New()
 	now := fmt.Sprint(time.Now().Unix())
-	setName := setPrefix + "-" + ipType + "-" + decisionType + "-" + u.String()
+	setName := setPrefix + "-" + ipType + "-" + decisionType + "-" + now + u.String()
+	logger := log.WithField("set", setName)
 
-	if len(setName)+len(now) < 128 {
-		setName = setName + "-" + now
+	if len(setName) > 128 {
+		logger.Warnf("Set name is longer than the 128 characters limit and will be truncated. Please reduce the length of the prefix")
+		setName = setName[:128]
 	}
+
 	return &WAFIpSet{
 		name:         setName,
 		ipType:       ipType,
 		decisionType: decisionType,
-		logger:       log.WithField("set", setName),
+		logger:       logger,
 		scope:        scope,
 		client:       client,
 	}
