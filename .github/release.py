@@ -21,7 +21,9 @@ def _goarch(goos):
     if goos == 'linux':
         yield 'ppc64le'
         yield 's390x'
-    yield 'riscv64'
+    # gopsutil doesn't build for riscv64 on freebsd
+    if goos != 'freebsd':
+        yield 'riscv64'
 
 
 def _goarm(goarch):
