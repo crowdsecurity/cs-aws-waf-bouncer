@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.12"
 
 [[package]]
@@ -13,14 +13,14 @@ wheels = [
 
 [[package]]
 name = "basedpyright"
-version = "1.27.1"
+version = "1.39.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "nodejs-wheel-binaries" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c6/62/c70698c616854639c23e7462276789dc6f42040f6abca39eb71cdcee9374/basedpyright-1.27.1.tar.gz", hash = "sha256:ddbe226c154c973a954626ce9ecb3b3a59df9d68bbab0e3f82a6c2c7b29616df", size = 21418646, upload-time = "2025-02-12T12:35:17.602Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ac/f4/4a77cc1ffb3dab7391642cde30163961d8ee973e9e6b6740c7d15aa3d3ba/basedpyright-1.39.0.tar.gz", hash = "sha256:6666f51c378c7ac45877c4c1c7041ee0b5b83d755ebc82f898f47b6fafe0cc4f", size = 25357403, upload-time = "2026-04-01T12:27:41.92Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/50/d1/bb5ea12225b1104d7b24e4c9d6a02298d1ed2352a7e5a80bc62e7d56b177/basedpyright-1.27.1-py3-none-any.whl", hash = "sha256:9f3647c1c8a0fc3d0a08b2156768ff717322f1e78d1b45686597093824a8f0d3", size = 11462483, upload-time = "2025-02-12T12:35:11.343Z" },
+    { url = "https://files.pythonhosted.org/packages/97/47/08145d1bcc3083ed20059bdecbde404bd767f91b91e2764ec01cffec9f4b/basedpyright-1.39.0-py3-none-any.whl", hash = "sha256:91b8ad50bc85ee4a985b928f9368c35c99eee5a56c44e99b2442fa12ecc3d670", size = 12353868, upload-time = "2026-04-01T12:27:38.495Z" },
 ]
 
 [[package]]
