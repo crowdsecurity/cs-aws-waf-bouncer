@@ -3,10 +3,10 @@ module github.com/crowdsecurity/cs-aws-waf-bouncer
 go 1.25.7
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.41.2
+	github.com/aws/aws-sdk-go-v2 v1.41.5
 	github.com/aws/aws-sdk-go-v2/config v1.32.10
 	github.com/aws/aws-sdk-go-v2/service/wafv2 v1.71.0
-	github.com/aws/smithy-go v1.24.1
+	github.com/aws/smithy-go v1.24.2
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/crowdsecurity/crowdsec v1.7.6
 	github.com/crowdsecurity/go-cs-bouncer v0.0.21
