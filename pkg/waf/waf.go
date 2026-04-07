@@ -221,18 +221,14 @@ func (w *WAF) DeleteRuleGroup(ctx context.Context, ruleGroupName string, token s
 	return err
 }
 
-func (w *WAF) UnassignRulesFromRuleGroup(ctx context.Context, ruleGroupName string, token string, id string) error {
+func (w *WAF) UnassignRulesFromRuleGroup(ctx context.Context, ruleGroup wafv2types.RuleGroup, token string) error {
 	_, err := w.client.UpdateRuleGroup(ctx, &wafv2.UpdateRuleGroupInput{
-		Name:        aws.String(ruleGroupName),
-		Scope:       wafv2types.Scope(w.config.Scope),
-		LockToken:   aws.String(token),
-		Id:          aws.String(id),
-		Rules:       []wafv2types.Rule{},
-		VisibilityConfig: &wafv2types.VisibilityConfig{
-			SampledRequestsEnabled:   false,
-			CloudWatchMetricsEnabled: false,
-			MetricName:               aws.String(ruleGroupName),
-		},
+		Name:             ruleGroup.Name,
+        Id:               ruleGroup.Id,
+        Scope:            wafv2types.Scope(w.config.Scope),
+        LockToken:        aws.String(token),
+        Rules:            []wafv2types.Rule{},
+        VisibilityConfig: ruleGroup.VisibilityConfig,
 	})
 
 	return err
@@ -441,7 +437,7 @@ func (w *WAF) CleanupAcl(ctx context.Context, acl *wafv2types.WebACL, token *str
 	}
 
 	if _, ok := w.ruleGroupsInfos[w.config.RuleGroupName]; ok {
-		token, _, err := w.GetRuleGroup(ctx, w.config.RuleGroupName)
+		token, rg, err := w.GetRuleGroup(ctx, w.config.RuleGroupName)
 		if err != nil {
 			return fmt.Errorf("failed to get RuleGroup %s: %w", w.config.RuleGroupName, err)
 		}
@@ -456,7 +452,7 @@ func (w *WAF) CleanupAcl(ctx context.Context, acl *wafv2types.WebACL, token *str
 		} else {
 			w.Logger.Debugf("Cleaning RuleGroup %s", w.config.RuleGroupName)
 
-			err = w.UnassignRulesFromRuleGroup(ctx, w.config.RuleGroupName, token, w.ruleGroupsInfos[w.config.RuleGroupName].Id)
+			err = w.UnassignRulesFromRuleGroup(ctx, rg, token)
 			if err != nil {
 				return fmt.Errorf("failed to unassign Rules from RuleGroup %s: %w", w.config.RuleGroupName, err)
 			}
