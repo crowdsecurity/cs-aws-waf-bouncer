@@ -475,6 +475,8 @@ func (w *WAF) CleanupAcl(ctx context.Context, acl *wafv2types.WebACL, token *str
 
 func (w *WAF) Cleanup(ctx context.Context) error {
 	var err error
+	var acl *wafv2types.WebACL
+	var token *string
 
 	w.lock.Lock()
 	defer w.lock.Unlock()
@@ -484,8 +486,8 @@ func (w *WAF) Cleanup(ctx context.Context) error {
 		return fmt.Errorf("failed to list WAF resources: %w", err)
 	}
 
-	if !w.config.DelegateAclManagement {
-		acl, token, err := w.GetWebACL(ctx, w.config.WebACLName, w.aclsInfo[w.config.WebACLName].Id)
+	if !w.config.UseExistingRuleGroup {
+		acl, token, err = w.GetWebACL(ctx, w.config.WebACLName, w.aclsInfo[w.config.WebACLName].Id)
 		if err != nil {
 			return fmt.Errorf("failed to get WebACL: %w", err)
 		}
@@ -496,9 +498,10 @@ func (w *WAF) Cleanup(ctx context.Context) error {
 
 func (w *WAF) ListResources(ctx context.Context) (map[string]Acl, map[string]IpSet, map[string]RuleGroup, error) {
 	var err error
+	var acls map[string]Acl
 
-	if !w.config.DelegateAclManagement {
-		acls, err := w.ListWebACL(ctx)
+	if !w.config.UseExistingRuleGroup {
+		acls, err = w.ListWebACL(ctx)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -519,6 +522,9 @@ func (w *WAF) ListResources(ctx context.Context) (map[string]Acl, map[string]IpS
 
 func (w *WAF) Init(ctx context.Context) error {
 	var err error
+	var acl *wafv2types.WebACL
+	var token *string
+
 	w.aclsInfo, w.setsInfos, w.ruleGroupsInfos, err = w.ListResources(ctx)
 
 	if err != nil {
@@ -541,7 +547,7 @@ func (w *WAF) Init(ctx context.Context) error {
 			return fmt.Errorf("WebACL %s does not exist in region %s", w.config.WebACLName, w.config.Region)
 		}
 
-		acl, token, err := w.GetWebACL(ctx, w.config.WebACLName, w.aclsInfo[w.config.WebACLName].Id)
+		acl, token, err = w.GetWebACL(ctx, w.config.WebACLName, w.aclsInfo[w.config.WebACLName].Id)
 
 		if err != nil {
 			return fmt.Errorf("failed to get WebACL: %w", err)
@@ -583,7 +589,7 @@ func (w *WAF) Init(ctx context.Context) error {
 			return fmt.Errorf("failed to add RuleGroup %s to WebACL %s: %w", w.config.RuleGroupName, w.config.WebACLName, err)
 		}
 	} else {
-		err = w.GetRuleGroup(ctx, w.config.RuleGroupName)
+		_, _, err = w.GetRuleGroup(ctx, w.config.RuleGroupName)
 
 		if err != nil {
 			return fmt.Errorf("failed to get RuleGroup %s: %w", w.config.RuleGroupName, err)
