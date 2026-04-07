@@ -574,6 +574,12 @@ func (w *WAF) Init(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to add RuleGroup %s to WebACL %s: %w", w.config.RuleGroupName, w.config.WebACLName, err)
 		}
+	} else {
+		err = w.GetRuleGroup(ctx, w.config.RuleGroupName)
+
+		if err != nil {
+			return fmt.Errorf("failed to get RuleGroup %s: %w", w.config.RuleGroupName, err)
+		}
 	}
 
 	return nil
