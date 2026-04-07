@@ -446,14 +446,16 @@ func (w *WAF) CleanupAcl(ctx context.Context, acl *wafv2types.WebACL, token *str
 			return fmt.Errorf("failed to get RuleGroup %s: %w", w.config.RuleGroupName, err)
 		}
 
-		w.Logger.Debugf("Deleting RuleGroup %s", w.config.RuleGroupName)
-
 		if !w.config.UseExistingRuleGroup {
+			w.Logger.Debugf("Deleting RuleGroup %s", w.config.RuleGroupName)
+
 			err = w.DeleteRuleGroup(ctx, w.config.RuleGroupName, token, w.ruleGroupsInfos[w.config.RuleGroupName].Id)
 			if err != nil {
 				return fmt.Errorf("failed to delete RuleGroup %s: %w", w.config.RuleGroupName, err)
 			}
 		} else {
+			w.Logger.Debugf("Cleaning RuleGroup %s", w.config.RuleGroupName)
+
 			err = w.UnassignRulesFromRuleGroup(ctx, w.config.RuleGroupName, token, w.ruleGroupsInfos[w.config.RuleGroupName].Id)
 			if err != nil {
 				return fmt.Errorf("failed to unassign Rules from RuleGroup %s: %w", w.config.RuleGroupName, err)
