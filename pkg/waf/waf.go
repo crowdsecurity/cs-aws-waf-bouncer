@@ -433,7 +433,7 @@ func (w *WAF) GetRuleGroup(ctx context.Context, ruleGroupname string) (string, w
 }
 
 func (w *WAF) CleanupAcl(ctx context.Context, acl *wafv2types.WebACL, token *string, allSets bool) error {
-	if !w.config.DelegateAclManagement {
+	if !w.config.UseExistingRuleGroup {
 		err := w.RemoveRuleGroupFromACL(ctx, acl, token)
 		if err != nil {
 			return fmt.Errorf("error removing rule group from ACL: %w", err)
@@ -448,7 +448,7 @@ func (w *WAF) CleanupAcl(ctx context.Context, acl *wafv2types.WebACL, token *str
 
 		w.Logger.Debugf("Deleting RuleGroup %s", w.config.RuleGroupName)
 
-		if !w.config.DelegateAclManagement {
+		if !w.config.UseExistingRuleGroup {
 			err = w.DeleteRuleGroup(ctx, w.config.RuleGroupName, token, w.ruleGroupsInfos[w.config.RuleGroupName].Id)
 			if err != nil {
 				return fmt.Errorf("failed to delete RuleGroup %s: %w", w.config.RuleGroupName, err)
@@ -552,7 +552,7 @@ func (w *WAF) Init(ctx context.Context) error {
 		return fmt.Errorf("failed to list resources: %w", err)
 	}
 
-	if !w.config.DelegateAclManagement {
+	if !w.config.UseExistingRuleGroup {
 		err = w.CreateRuleGroup(ctx, w.config.RuleGroupName)
 
 		if err != nil {
