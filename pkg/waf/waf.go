@@ -484,9 +484,11 @@ func (w *WAF) Cleanup(ctx context.Context) error {
 		return fmt.Errorf("failed to list WAF resources: %w", err)
 	}
 
-	acl, token, err := w.GetWebACL(ctx, w.config.WebACLName, w.aclsInfo[w.config.WebACLName].Id)
-	if err != nil {
-		return fmt.Errorf("failed to get WebACL: %w", err)
+	if !w.config.DelegateAclManagement {
+		acl, token, err := w.GetWebACL(ctx, w.config.WebACLName, w.aclsInfo[w.config.WebACLName].Id)
+		if err != nil {
+			return fmt.Errorf("failed to get WebACL: %w", err)
+		}
 	}
 
 	return w.CleanupAcl(ctx, acl, token, false)
@@ -495,9 +497,11 @@ func (w *WAF) Cleanup(ctx context.Context) error {
 func (w *WAF) ListResources(ctx context.Context) (map[string]Acl, map[string]IpSet, map[string]RuleGroup, error) {
 	var err error
 
-	acls, err := w.ListWebACL(ctx)
-	if err != nil {
-		return nil, nil, nil, err
+	if !w.config.DelegateAclManagement {
+		acls, err := w.ListWebACL(ctx)
+		if err != nil {
+			return nil, nil, nil, err
+		}
 	}
 
 	sets, err := w.ListIpSet(ctx)
@@ -521,8 +525,10 @@ func (w *WAF) Init(ctx context.Context) error {
 		return fmt.Errorf("failed to list resources: %w", err)
 	}
 
-	w.Logger.Tracef("Found %d WebACLs", len(w.aclsInfo))
-	w.Logger.Tracef("ACLs: %+v", w.aclsInfo)
+	if !w.config.UseExistingRuleGroup {
+		w.Logger.Tracef("Found %d WebACLs", len(w.aclsInfo))
+		w.Logger.Tracef("ACLs: %+v", w.aclsInfo)
+	}
 
 	w.Logger.Tracef("Found %d IPSets", len(w.setsInfos))
 	w.Logger.Tracef("IPSets: %+v", w.setsInfos)
@@ -530,14 +536,16 @@ func (w *WAF) Init(ctx context.Context) error {
 	w.Logger.Tracef("Found %d RuleGroups", len(w.ruleGroupsInfos))
 	w.Logger.Tracef("RuleGroups: %+v", w.ruleGroupsInfos)
 
-	if _, ok := w.aclsInfo[w.config.WebACLName]; !ok {
-		return fmt.Errorf("WebACL %s does not exist in region %s", w.config.WebACLName, w.config.Region)
-	}
+	if !w.config.UseExistingRuleGroup {
+		if _, ok := w.aclsInfo[w.config.WebACLName]; !ok {
+			return fmt.Errorf("WebACL %s does not exist in region %s", w.config.WebACLName, w.config.Region)
+		}
 
-	acl, token, err := w.GetWebACL(ctx, w.config.WebACLName, w.aclsInfo[w.config.WebACLName].Id)
+		acl, token, err := w.GetWebACL(ctx, w.config.WebACLName, w.aclsInfo[w.config.WebACLName].Id)
 
-	if err != nil {
-		return fmt.Errorf("failed to get WebACL: %w", err)
+		if err != nil {
+			return fmt.Errorf("failed to get WebACL: %w", err)
+		}
 	}
 
 	w.ipsetManager = NewIPSetManager(w.config.IpsetPrefix, w.config.Scope, w.client, w.Logger)
