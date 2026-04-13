@@ -45,6 +45,7 @@ type AclConfig struct {
 	CloudWatchMetricName string `yaml:"cloudwatch_metric_name"`
 	SampleRequests       bool   `yaml:"sample_requests"`
 	CleanOnStart         bool   `yaml:"remove_sets_on_start"`
+	UseExistingRuleGroup bool   `yaml:"use_existing_rule_group"`
 }
 
 var ValidActions = []string{"ban", "captcha", "count"}
@@ -129,6 +130,12 @@ func getConfigFromEnv(config *bouncerConfig) {
 					if err != nil {
 						log.Warnf("Invalid value for %s: %s, defaulting to false", key, value)
 						acl.CleanOnStart = false
+					}
+				case "USE_EXISTING_RULE_GROUP":
+					acl.UseExistingRuleGroup, err = strconv.ParseBool(value)
+					if err != nil {
+						log.Warnf("Invalid value for %s: %s, defaulting to false", key, value)
+						acl.UseExistingRuleGroup = false
 					}
 				}
 			} else {
