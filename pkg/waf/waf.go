@@ -224,11 +224,11 @@ func (w *WAF) DeleteRuleGroup(ctx context.Context, ruleGroupName string, token s
 func (w *WAF) UnassignRulesFromRuleGroup(ctx context.Context, ruleGroup wafv2types.RuleGroup, token string) error {
 	_, err := w.client.UpdateRuleGroup(ctx, &wafv2.UpdateRuleGroupInput{
 		Name:             ruleGroup.Name,
-        Id:               ruleGroup.Id,
-        Scope:            wafv2types.Scope(w.config.Scope),
-        LockToken:        aws.String(token),
-        Rules:            []wafv2types.Rule{},
-        VisibilityConfig: ruleGroup.VisibilityConfig,
+    	Id:               ruleGroup.Id,
+    	Scope:            wafv2types.Scope(w.config.Scope),
+    	LockToken:        aws.String(token),
+    	Rules:            []wafv2types.Rule{},
+    	VisibilityConfig: ruleGroup.VisibilityConfig,
 	})
 
 	return err
