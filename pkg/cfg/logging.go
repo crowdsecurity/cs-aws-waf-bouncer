@@ -10,8 +10,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/writer"
 	"gopkg.in/natefinch/lumberjack.v2"
-
-	"github.com/crowdsecurity/go-cs-lib/ptr"
 )
 
 type LoggingConfig struct {
@@ -53,7 +51,7 @@ func (c *LoggingConfig) setDefaults() {
 	}
 
 	if c.LogLevel == nil {
-		c.LogLevel = ptr.Of(log.InfoLevel)
+		c.LogLevel = new(log.InfoLevel)
 	}
 
 	if c.LogMaxSize == 0 {
@@ -69,7 +67,7 @@ func (c *LoggingConfig) setDefaults() {
 	}
 
 	if c.CompressLogs == nil {
-		c.CompressLogs = ptr.Of(true)
+		c.CompressLogs = new(true)
 	}
 }
 
