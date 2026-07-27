@@ -16,6 +16,8 @@ linters:
     - gocognit
     - goconst
     - godox
+    # deprecated, superseded by gomodguard_v2 (enabled by "default: all")
+    - gomodguard
     - lll
     - mnd
     - nestif
@@ -46,6 +48,12 @@ linters:
         - rangeValCopy
         - unnamedResult
         - whyNoLint
+
+    govet:
+      disable:
+        # reports the inliner's own limitations ("cannot inline: type parameter
+        # inference is not yet supported") on calls to slices.Contains
+        - inline
 
     misspell:
       locale: US
@@ -103,6 +111,11 @@ linters:
           disabled: true
         - name: use-errors-new
           disabled: true
+        - name: unhandled-error
+          arguments:
+            - fmt.Print
+            - fmt.Printf
+            - fmt.Println
 
     wsl:
       allow-trailing-comment: true
@@ -116,6 +129,12 @@ linters:
       - linters:
           - govet
         text: 'shadow: declaration of "err" shadows declaration'
+
+      # Execute() is only ever called from main()
+      - linters:
+          - revive
+        path: cmd/root.go
+        text: 'deep-exit: calls to flag.Parse'
     paths:
       - third_party$
       - builtin$
