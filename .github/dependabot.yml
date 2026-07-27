@@ -7,6 +7,13 @@ updates:
     labels:
       - "kind/dependencies"
       - "github-actions"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
@@ -14,6 +21,13 @@ updates:
     labels:
       - "kind/dependencies"
       - "go"
+    groups:
+      go-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
   - package-ecosystem: "uv"
     directory: "test"
     schedule:
@@ -21,3 +35,10 @@ updates:
     labels:
       - "kind/dependencies"
       - "python"
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
