@@ -1,6 +1,14 @@
 api_key: ${API_KEY}
 api_url: "http://127.0.0.1:8080/"
 update_frequency: 10s
+# The 3 options below are sent to the local API, and restrict what the bouncer pulls at all.
+# Use the per web ACL decisions_filter to further restrict what applies to a given web ACL.
+# Only keep decisions whose scenario contains one of these words, eg ["http", "ssh"]:
+#scenarios_containing: []
+# Drop decisions whose scenario contains one of these words:
+#scenarios_not_containing: []
+# Only keep decisions coming from these origins, eg ["cscli", "crowdsec"]:
+#origins: []
 log_media: file
 log_dir: /var/log/
 log_level: info

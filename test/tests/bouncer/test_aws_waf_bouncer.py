@@ -1,3 +1,14 @@
+def valid_waf_config():
+    return {
+        "web_acl_name": "testwebacl",
+        "fallback_action": "ban",
+        "rule_group_name": "crowdsec-rule-group-eu-west-1",
+        "scope": "REGIONAL",
+        "ipset_prefix": "crowdsec-ipset-a",
+        "region": "eu-west-1",
+    }
+
+
 def test_no_api_key(crowdsec, bouncer, aw_cfg_factory):
     cfg = aw_cfg_factory()
     with bouncer(cfg) as aw:
@@ -129,4 +140,51 @@ def test_partial_config(bouncer, aw_cfg_factory):
 
         # this requires more time
         aw.proc.wait(timeout=5)
+        assert not aw.proc.is_running()
+
+
+def test_decisions_filter_config(bouncer, aw_cfg_factory):
+    """The LAPI-side filters and the per web ACL decisions_filter are accepted."""
+    waf = valid_waf_config()
+    waf["decisions_filter"] = {
+        "include_origins": ["cscli", "crowdsec"],
+        "exclude_origins": ["CAPI"],
+        "scenarios_containing": ["http"],
+        "scenarios_not_containing": ["crawl"],
+    }
+
+    cfg = aw_cfg_factory()
+    cfg["api_key"] = "not-used"
+    cfg["api_url"] = "http://localhost:8237"
+    cfg["scenarios_containing"] = ["http"]
+    cfg["scenarios_not_containing"] = ["crawl"]
+    cfg["origins"] = ["cscli", "crowdsec"]
+    cfg["waf_config"] = [waf]
+
+    with bouncer(cfg) as aw:
+        # the config parses: the bouncer gets past cfg.NewConfig() and starts up
+        aw.wait_for_lines_fnmatch(
+            [
+                "*Starting crowdsec-aws-waf-bouncer*",
+            ]
+        )
+
+
+def test_decisions_filter_unknown_key(bouncer, aw_cfg_factory):
+    """decisions_filter has no 'origins' key: use include_origins/exclude_origins."""
+    waf = valid_waf_config()
+    waf["decisions_filter"] = {"origins": ["cscli"]}
+
+    cfg = aw_cfg_factory()
+    cfg["api_key"] = "not-used"
+    cfg["api_url"] = "http://localhost:8237"
+    cfg["waf_config"] = [waf]
+
+    with bouncer(cfg) as aw:
+        aw.wait_for_lines_fnmatch(
+            [
+                "*could not parse configuration: failed to unmarshal:*field origins not found*",
+            ]
+        )
+        aw.proc.wait(timeout=0.2)
         assert not aw.proc.is_running()
