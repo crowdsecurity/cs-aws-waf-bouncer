@@ -28,28 +28,111 @@ type bouncerConfig struct {
 	CertPath           string        `yaml:"cert_path"`
 	CAPath             string        `yaml:"ca_cert_path"`
 	SupportedActions   []string      `yaml:"supported_actions"`
+	// The following options are passed as-is to LAPI, and thus restrict what the bouncer pulls
+	// in the first place. Use the per-ACL decisions_filter to further restrict what applies to
+	// a given web ACL.
+	ScenariosContaining    []string `yaml:"scenarios_containing"`
+	ScenariosNotContaining []string `yaml:"scenarios_not_containing"`
+	Origins                []string `yaml:"origins"`
 }
 
 type AclConfig struct {
-	WebACLName           string `yaml:"web_acl_name"`
-	RuleGroupName        string `yaml:"rule_group_name"`
-	Region               string `yaml:"region"`
-	Scope                string `yaml:"scope"`
-	IpsetPrefix          string `yaml:"ipset_prefix"`
-	FallbackAction       string `yaml:"fallback_action"`
-	AWSProfile           string `yaml:"aws_profile"`
-	IPHeader             string `yaml:"ip_header"`
-	IPHeaderPosition     string `yaml:"ip_header_position"`
-	Capacity             int    `yaml:"capacity"`
-	CloudWatchEnabled    bool   `yaml:"cloudwatch_enabled"`
-	CloudWatchMetricName string `yaml:"cloudwatch_metric_name"`
-	SampleRequests       bool   `yaml:"sample_requests"`
-	CleanOnStart         bool   `yaml:"remove_sets_on_start"`
+	WebACLName           string          `yaml:"web_acl_name"`
+	RuleGroupName        string          `yaml:"rule_group_name"`
+	Region               string          `yaml:"region"`
+	Scope                string          `yaml:"scope"`
+	IpsetPrefix          string          `yaml:"ipset_prefix"`
+	FallbackAction       string          `yaml:"fallback_action"`
+	AWSProfile           string          `yaml:"aws_profile"`
+	IPHeader             string          `yaml:"ip_header"`
+	IPHeaderPosition     string          `yaml:"ip_header_position"`
+	Capacity             int             `yaml:"capacity"`
+	CloudWatchEnabled    bool            `yaml:"cloudwatch_enabled"`
+	CloudWatchMetricName string          `yaml:"cloudwatch_metric_name"`
+	SampleRequests       bool            `yaml:"sample_requests"`
+	CleanOnStart         bool            `yaml:"remove_sets_on_start"`
+	DecisionsFilter      DecisionsFilter `yaml:"decisions_filter"`
 }
 
 var ValidActions = []string{"ban", "captcha", "count"}
 var validScopes = []string{"REGIONAL", "CLOUDFRONT"}
 var validIpHeaderPosition = []string{"FIRST", "LAST", "ANY"}
+
+// splitEnvList parses a comma-separated environment variable into a list. An empty value yields
+// a nil list rather than a list holding one empty string.
+func splitEnvList(value string) []string {
+	var list []string
+
+	for item := range strings.SplitSeq(value, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			list = append(list, item)
+		}
+	}
+
+	return list
+}
+
+// setAclConfigFromEnv applies a single BOUNCER_WAF_CONFIG_<n>_* variable to a web ACL config.
+// name is the part after the index (eg. "IPSET_PREFIX"), envKey the full variable name, used
+// for warnings.
+func setAclConfigFromEnv(acl *AclConfig, name string, envKey string, value string) {
+	var err error
+
+	switch name {
+	case "WEB_ACL_NAME":
+		acl.WebACLName = value
+	case "RULE_GROUP_NAME":
+		acl.RuleGroupName = value
+	case "REGION":
+		acl.Region = value
+	case "SCOPE":
+		acl.Scope = value
+	case "IPSET_PREFIX":
+		acl.IpsetPrefix = value
+	case "FALLBACK_ACTION":
+		acl.FallbackAction = value
+	case "AWS_PROFILE":
+		acl.AWSProfile = value
+	case "IP_HEADER":
+		acl.IPHeader = value
+	case "IP_HEADER_POSITION":
+		acl.IPHeaderPosition = value
+	case "CAPACITY":
+		acl.Capacity, err = strconv.Atoi(value)
+		if err != nil {
+			log.Warnf("Invalid value for %s: %s", envKey, value)
+			acl.Capacity = 300
+		}
+	case "CLOUDWATCH_ENABLED":
+		acl.CloudWatchEnabled, err = strconv.ParseBool(value)
+		if err != nil {
+			log.Warnf("Invalid value for %s: %s, defaulting to false", envKey, value)
+			acl.CloudWatchEnabled = false
+		}
+	case "CLOUDWATCH_METRIC_NAME":
+		acl.CloudWatchMetricName = value
+	case "SAMPLE_REQUESTS":
+		acl.SampleRequests, err = strconv.ParseBool(value)
+		if err != nil {
+			log.Warnf("Invalid value for %s: %s, defaulting to false", envKey, value)
+			acl.SampleRequests = false
+		}
+	case "CLEAN_ON_START":
+		acl.CleanOnStart, err = strconv.ParseBool(value)
+		if err != nil {
+			log.Warnf("Invalid value for %s: %s, defaulting to false", envKey, value)
+			acl.CleanOnStart = false
+		}
+	case "DECISIONS_FILTER_INCLUDE_ORIGINS":
+		acl.DecisionsFilter.IncludeOrigins = splitEnvList(value)
+	case "DECISIONS_FILTER_EXCLUDE_ORIGINS":
+		acl.DecisionsFilter.ExcludeOrigins = splitEnvList(value)
+	case "DECISIONS_FILTER_SCENARIOS_CONTAINING":
+		acl.DecisionsFilter.ScenariosContaining = splitEnvList(value)
+	case "DECISIONS_FILTER_SCENARIOS_NOT_CONTAINING":
+		acl.DecisionsFilter.ScenariosNotContaining = splitEnvList(value)
+	}
+}
 
 func getConfigFromEnv(config *bouncerConfig) {
 	var (
@@ -84,53 +167,7 @@ func getConfigFromEnv(config *bouncerConfig) {
 					acl = acls[k2[0]]
 				}
 
-				k2 = k2[2:]
-				switch k2 {
-				case "WEB_ACL_NAME":
-					acl.WebACLName = value
-				case "RULE_GROUP_NAME":
-					acl.RuleGroupName = value
-				case "REGION":
-					acl.Region = value
-				case "SCOPE":
-					acl.Scope = value
-				case "IPSET_PREFIX":
-					acl.IpsetPrefix = value
-				case "FALLBACK_ACTION":
-					acl.FallbackAction = value
-				case "AWS_PROFILE":
-					acl.AWSProfile = value
-				case "IP_HEADER":
-					acl.IPHeader = value
-				case "IP_HEADER_POSITION":
-					acl.IPHeaderPosition = value
-				case "CAPACITY":
-					acl.Capacity, err = strconv.Atoi(value)
-					if err != nil {
-						log.Warnf("Invalid value for %s: %s", key, value)
-						acl.Capacity = 300
-					}
-				case "CLOUDWATCH_ENABLED":
-					acl.CloudWatchEnabled, err = strconv.ParseBool(value)
-					if err != nil {
-						log.Warnf("Invalid value for %s: %s, defaulting to false", key, value)
-						acl.CloudWatchEnabled = false
-					}
-				case "CLOUDWATCH_METRIC_NAME":
-					acl.CloudWatchMetricName = value
-				case "SAMPLE_REQUESTS":
-					acl.SampleRequests, err = strconv.ParseBool(value)
-					if err != nil {
-						log.Warnf("Invalid value for %s: %s, defaulting to false", key, value)
-						acl.SampleRequests = false
-					}
-				case "CLEAN_ON_START":
-					acl.CleanOnStart, err = strconv.ParseBool(value)
-					if err != nil {
-						log.Warnf("Invalid value for %s: %s, defaulting to false", key, value)
-						acl.CleanOnStart = false
-					}
-				}
+				setAclConfigFromEnv(acl, k2[2:], key, value)
 			} else {
 				switch key {
 				case "BOUNCER_API_KEY":
@@ -183,7 +220,13 @@ func getConfigFromEnv(config *bouncerConfig) {
 				case "BOUNCER_CA_PATH":
 					config.CAPath = value
 				case "BOUNCER_SUPPORTED_ACTIONS":
-					config.SupportedActions = strings.Split(value, ",")
+					config.SupportedActions = splitEnvList(value)
+				case "BOUNCER_SCENARIOS_CONTAINING":
+					config.ScenariosContaining = splitEnvList(value)
+				case "BOUNCER_SCENARIOS_NOT_CONTAINING":
+					config.ScenariosNotContaining = splitEnvList(value)
+				case "BOUNCER_ORIGINS":
+					config.Origins = splitEnvList(value)
 				}
 			}
 		}

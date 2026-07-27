@@ -706,6 +706,11 @@ func (w *WAF) UpdateGeoSet(ctx context.Context, d Decisions) error {
 	return nil
 }
 
+// DecisionsFilter returns the filter restricting which decisions apply to this web ACL.
+func (w *WAF) DecisionsFilter() cfg.DecisionsFilter {
+	return w.config.DecisionsFilter
+}
+
 func (w *WAF) Process(ctx context.Context) error {
 	for {
 		select {

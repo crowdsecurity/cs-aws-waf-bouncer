@@ -128,6 +128,40 @@ func processDecisions(decisions *models.DecisionsStreamResponse, supportedAction
 	return d
 }
 
+// dispatchDecisions sends the decisions returned by LAPI to every web ACL, applying the
+// per-ACL decisions_filter first.
+func dispatchDecisions(decisions *models.DecisionsStreamResponse, supportedActions []string) {
+	// Web ACLs without a filter all get the same result, so only compute it once.
+	var unfiltered *waf.Decisions
+
+	for _, w := range wafInstances {
+		filter := w.DecisionsFilter()
+
+		if filter.IsEmpty() {
+			if unfiltered == nil {
+				d := processDecisions(decisions, supportedActions)
+				unfiltered = &d
+			}
+
+			w.DecisionsChan <- *unfiltered
+
+			continue
+		}
+
+		filtered := filter.Apply(decisions)
+		if len(filtered.New) == 0 && len(filtered.Deleted) == 0 {
+			w.Logger.Debug("No decisions left after filtering")
+
+			continue
+		}
+
+		w.Logger.Debugf("Kept %d/%d new and %d/%d deleted decisions after filtering",
+			len(filtered.New), len(decisions.New), len(filtered.Deleted), len(decisions.Deleted))
+
+		w.DecisionsChan <- processDecisions(filtered, supportedActions)
+	}
+}
+
 func Execute() error {
 	configPath := flag.String("c", "", "path to crowdsec-aws-waf-bouncer.yaml")
 	bouncerVersion := flag.Bool("version", false, "display version and exit")
@@ -193,15 +227,18 @@ func Execute() error {
 	}
 
 	bouncer := &csbouncer.StreamBouncer{
-		APIKey:             config.APIKey,
-		APIUrl:             config.APIUrl,
-		TickerInterval:     config.UpdateFrequency,
-		InsecureSkipVerify: aws.Bool(config.InsecureSkipVerify),
-		UserAgent:          fmt.Sprintf("crowdsec-aws-waf-bouncer/%s", version.String()),
-		Scopes:             []string{"ip", "range", "country"},
-		CertPath:           config.CertPath,
-		KeyPath:            config.KeyPath,
-		CAPath:             config.CAPath,
+		APIKey:                 config.APIKey,
+		APIUrl:                 config.APIUrl,
+		TickerInterval:         config.UpdateFrequency,
+		InsecureSkipVerify:     aws.Bool(config.InsecureSkipVerify),
+		UserAgent:              fmt.Sprintf("crowdsec-aws-waf-bouncer/%s", version.String()),
+		Scopes:                 []string{"ip", "range", "country"},
+		CertPath:               config.CertPath,
+		KeyPath:                config.KeyPath,
+		CAPath:                 config.CAPath,
+		ScenariosContaining:    config.ScenariosContaining,
+		ScenariosNotContaining: config.ScenariosNotContaining,
+		Origins:                config.Origins,
 	}
 
 	if err := bouncer.Init(); err != nil {
@@ -265,10 +302,7 @@ func Execute() error {
 					continue
 				}
 
-				d := processDecisions(decisions, config.SupportedActions)
-				for _, w := range wafInstances {
-					w.DecisionsChan <- d
-				}
+				dispatchDecisions(decisions, config.SupportedActions)
 			}
 		}
 	})

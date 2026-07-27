@@ -13,3 +13,10 @@ waf_config:
     rule_group_name: crowdsec-rule-group-cloudfront
     scope: CLOUDFRONT
     ipset_prefix: crowdsec-blocklist-cf
+    # Restrict, on the bouncer side, which of the decisions returned by the local API apply to
+    # this web ACL. Origins are matched exactly, scenarios as a substring, both case-insensitively.
+    #decisions_filter:
+    #  include_origins: ["cscli", "crowdsec"]
+    #  exclude_origins: ["CAPI"]
+    #  scenarios_containing: ["http"]
+    #  scenarios_not_containing: ["crawl"]
