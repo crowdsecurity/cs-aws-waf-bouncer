@@ -12,7 +12,8 @@ override_dh_auto_clean:
 override_dh_auto_test:
 override_dh_auto_build:
 override_dh_auto_install:
-	@make build
+# binaries are injected at package creation time
+#	@make build
 
 	@BOUNCER=crowdsec-aws-waf-bouncer; \
 	PKG="$$BOUNCER"; \
