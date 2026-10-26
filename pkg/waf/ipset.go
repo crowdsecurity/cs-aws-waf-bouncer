@@ -40,6 +40,11 @@ func (w *WAFIpSet) Add(ip string) {
 }
 
 func (w *WAFIpSet) Remove(ip string) {
+	// DeleteIp calls this on every set: only the set holding the IP needs an UpdateIPSet.
+	if !w.Contains(ip) {
+		return
+	}
+
 	w.ips = removesString(w.ips, ip)
 	w.stale = true
 }

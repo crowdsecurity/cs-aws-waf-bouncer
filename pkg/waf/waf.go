@@ -31,6 +31,8 @@ type WAF struct {
 	ipsetManager     *IPSetManager
 	visibilityConfig *wafv2types.VisibilityConfig
 	lock             sync.Mutex
+	// IP sets referenced by the rule group as last written, so unchanged rules aren't rewritten every poll.
+	ruleGroupSetsKey string
 }
 
 type IpSet struct {
@@ -63,7 +65,7 @@ func (w *WAF) getIpSetReferenceStatement(ipsets []*WAFIpSet) *wafv2types.OrState
 	}
 }
 
-func (w *WAF) getWafStatement(actionType string) *wafv2types.Statement {
+func (w *WAF) referencedSets(actionType string) []*WAFIpSet {
 	sets := make([]*WAFIpSet, 0)
 
 	for _, ipset := range w.ipsetManager.IPSets {
@@ -71,6 +73,27 @@ func (w *WAF) getWafStatement(actionType string) *wafv2types.Statement {
 			sets = append(sets, ipset)
 		}
 	}
+
+	return sets
+}
+
+func (w *WAF) referencedSetsKey() string {
+	parts := make([]string, 0, len(cfg.ValidActions))
+
+	for _, actionType := range cfg.ValidActions {
+		arns := make([]string, 0)
+		for _, ipset := range w.referencedSets(actionType) {
+			arns = append(arns, ipset.arn)
+		}
+
+		parts = append(parts, actionType+":"+strings.Join(arns, ","))
+	}
+
+	return strings.Join(parts, ";")
+}
+
+func (w *WAF) getWafStatement(actionType string) *wafv2types.Statement {
+	sets := w.referencedSets(actionType)
 
 	switch len(sets) {
 	case 0:
@@ -146,6 +169,7 @@ func (w *WAF) CreateRuleGroup(ctx context.Context, ruleGroupName string) error {
 		ARN: *r.Summary.ARN,
 		Id:  *r.Summary.Id,
 	}
+	w.ruleGroupSetsKey = ""
 
 	return nil
 }
@@ -156,6 +180,12 @@ func (w *WAF) UpdateRuleGroup(ctx context.Context) error {
 
 	if len(w.ipsetManager.IPSets) == 0 {
 		w.Logger.Debugf("No IPSets to add to rule group %s", w.config.RuleGroupName)
+		return nil
+	}
+
+	setsKey := w.referencedSetsKey()
+	if setsKey == w.ruleGroupSetsKey {
+		w.Logger.Debugf("IPSets referenced by rule group %s are unchanged", w.config.RuleGroupName)
 		return nil
 	}
 
@@ -180,9 +210,9 @@ func (w *WAF) UpdateRuleGroup(ctx context.Context) error {
 				Statement: statement,
 				Priority:  priority,
 				VisibilityConfig: &wafv2types.VisibilityConfig{
-					SampledRequestsEnabled:   false,
-					CloudWatchMetricsEnabled: false,
-					MetricName:               aws.String(w.config.RuleGroupName),
+					SampledRequestsEnabled:   w.visibilityConfig.SampledRequestsEnabled,
+					CloudWatchMetricsEnabled: w.visibilityConfig.CloudWatchMetricsEnabled,
+					MetricName:               aws.String(fmt.Sprintf("%s-%s", *w.visibilityConfig.MetricName, actionType)),
 				},
 			}
 			priority++
@@ -206,6 +236,8 @@ func (w *WAF) UpdateRuleGroup(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	w.ruleGroupSetsKey = setsKey
 
 	return nil
 }
@@ -316,13 +348,9 @@ func (w *WAF) AddRuleGroupToACL(ctx context.Context, acl *wafv2types.WebACL, tok
 	w.Logger.Infof("Adding RuleGroup %s to ACL %s", w.config.RuleGroupName, *acl.Name)
 
 	rule := wafv2types.Rule{
-		Name:     aws.String(w.config.RuleGroupName),
-		Priority: w.getPriority(acl),
-		VisibilityConfig: &wafv2types.VisibilityConfig{
-			CloudWatchMetricsEnabled: false,
-			MetricName:               aws.String(w.config.RuleGroupName),
-			SampledRequestsEnabled:   false,
-		},
+		Name:             aws.String(w.config.RuleGroupName),
+		Priority:         w.getPriority(acl),
+		VisibilityConfig: w.visibilityConfig,
 		Statement: &wafv2types.Statement{
 			RuleGroupReferenceStatement: &wafv2types.RuleGroupReferenceStatement{
 				ARN: aws.String(w.ruleGroupsInfos[w.config.RuleGroupName].ARN),
